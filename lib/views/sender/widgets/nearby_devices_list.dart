@@ -40,12 +40,12 @@ class const NearbyDevicesList({super.key}) extends ConsumerWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Nearby Receivers',
+                    'Nearby Screens',
                     style: theme.textTheme.titleMedium?.copyWith(fontWeight: .w700),
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Refresh LAN scan',
+                  tooltip: 'Refresh nearby screens',
                   onPressed: () => ref.read(sessionProvider.notifier).startDiscovery(),
                   icon: const Icon(Icons.refresh_rounded),
                 ),
@@ -65,16 +65,16 @@ class const NearbyDevicesList({super.key}) extends ConsumerWidget {
                     child: const Icon(Icons.desktop_windows_rounded, color: AppColors.primaryLight),
                   ),
                   title: Text(peer.endpoint.deviceName),
-                  subtitle: Text('${peer.endpoint.ip}:${peer.endpoint.port}'),
+                  subtitle: Text(peer.endpoint.ip),
                   trailing: Row(
                     mainAxisSize: .min,
                     spacing: 8,
                     children: [
                       if (peer.endpoint.requiresPin)
                         const Icon(Icons.lock_outline_rounded, size: 18, color: AppColors.accentOrange),
-                      FilledButton.tonal(
+                      FilledButton(
                         onPressed: () => _connectToPeer(context, ref, peer),
-                        child: const Text('Cast'),
+                        child: const Text('Connect'),
                       ),
                     ],
                   ),
@@ -126,9 +126,13 @@ class _RadarEmptyStateState extends State<_RadarEmptyState>
               child: const Icon(Icons.wifi_tethering_rounded, color: AppColors.cyanAccent, size: 26),
             ),
           ),
-          Text('Scanning LAN (UDP 41234)...', textAlign: .center, style: theme.textTheme.titleSmall?.copyWith(fontWeight: .w600)),
           Text(
-            'Open Phone2Screen Receiver on a PC, or use QR / Manual IP.',
+            'Looking for screens on your Wi-Fi...',
+            textAlign: .center,
+            style: theme.textTheme.titleSmall?.copyWith(fontWeight: .w600),
+          ),
+          Text(
+            'Open Phone2Screen in Receive mode on your PC or TV.',
             textAlign: .center,
             style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),

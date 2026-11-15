@@ -6,8 +6,9 @@ import '../../models/device_role.dart';
 import '../../models/session_phase.dart';
 import '../../providers/platform_provider.dart';
 import '../../providers/session_provider.dart';
+import 'how_to_use_sheet.dart';
 
-/// Top bar with brand mark, live status pill, RTT chip, role switcher, and settings.
+/// Top bar with brand mark, live status pill, role switcher, guide, and settings.
 class const AppShellHeader({super.key, required final VoidCallback onOpenSettings})
     extends ConsumerWidget implements PreferredSizeWidget {
   @override
@@ -25,15 +26,14 @@ class const AppShellHeader({super.key, required final VoidCallback onOpenSetting
         bottom: false,
         child: Container(
           height: 64,
-          padding: const .symmetric(horizontal: 12),
+          padding: const .symmetric(horizontal: 10),
           decoration: BoxDecoration(border: Border(bottom: BorderSide(color: colors.outlineVariant))),
           child: LayoutBuilder(
             builder: (context, constraints) {
               final wide = constraints.maxWidth >= 680;
               final showTitle = constraints.maxWidth >= 500;
-              final isStreaming = session.phase == .streaming;
               return Row(
-                spacing: 8,
+                spacing: wide ? 8 : 4,
                 children: [
                   Container(
                     width: 34,
@@ -43,20 +43,14 @@ class const AppShellHeader({super.key, required final VoidCallback onOpenSetting
                   ),
                   if (showTitle)
                     Text('Phone2Screen', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: .w700)),
-                  _PhasePill(phase: session.phase, showLabel: wide, latencyMs: isStreaming ? session.telemetry.latencyMs : null),
-                  if (wide && isStreaming)
-                    Container(
-                      padding: const .symmetric(horizontal: 9, vertical: 5),
-                      decoration: BoxDecoration(color: colors.surfaceContainer, borderRadius: .circular(999)),
-                      child: Text('${session.telemetry.latencyMs} ms', style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: .w600)),
-                    ),
+                  _PhasePill(phase: session.phase, showLabel: wide),
                   const Spacer(),
                   SegmentedButton<DeviceRole>(
                     showSelectedIcon: false,
-                    style: const ButtonStyle(
+                    style: ButtonStyle(
                       visualDensity: .compact,
                       tapTargetSize: .shrinkWrap,
-                      padding: WidgetStatePropertyAll(.symmetric(horizontal: 10)),
+                      padding: WidgetStatePropertyAll(.symmetric(horizontal: wide ? 10 : 8)),
                     ),
                     segments: const [
                       ButtonSegment(value: .receiver, label: Text('Receive')),
@@ -65,7 +59,18 @@ class const AppShellHeader({super.key, required final VoidCallback onOpenSetting
                     selected: {activeRole},
                     onSelectionChanged: (s) => _onRoleSelected(context, ref, activeRole, s.first, session.phase),
                   ),
-                  IconButton(onPressed: onOpenSettings, icon: const Icon(Icons.settings_outlined), tooltip: 'Settings'),
+                  IconButton(
+                    onPressed: () => HowToUseSheet.show(context),
+                    icon: const Icon(Icons.help_outline_rounded),
+                    tooltip: 'How to Use',
+                    visualDensity: .compact,
+                  ),
+                  IconButton(
+                    onPressed: onOpenSettings,
+                    icon: const Icon(Icons.settings_outlined),
+                    tooltip: 'Settings',
+                    visualDensity: .compact,
+                  ),
                 ],
               );
             },
@@ -108,34 +113,35 @@ class const AppShellHeader({super.key, required final VoidCallback onOpenSetting
 class const _PhasePill({
   required final SessionPhase phase,
   required final bool showLabel,
-  final int? latencyMs,
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final color = switch (phase) {
-      .streaming => AppColors.accentGreen,
-      .hosting || .discovering => AppColors.primaryBlue,
-      .connecting || .reconnecting => AppColors.accentOrange,
-      .failed => AppColors.accentRed,
-      .idle => AppColors.textSecondaryDark,
+    final (label, color) = switch (phase) {
+      .streaming => ('Live', AppColors.accentGreen),
+      .hosting || .discovering => ('Ready', AppColors.primaryBlue),
+      .connecting => ('Connecting', AppColors.accentOrange),
+      .reconnecting => ('Reconnecting', AppColors.accentOrange),
+      .failed => ('Issue', AppColors.accentRed),
+      .idle => ('Ready', AppColors.textSecondaryDark),
     };
-    return Container(
-      padding: .symmetric(horizontal: showLabel ? 10 : 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: .circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        mainAxisSize: .min,
-        spacing: 6,
-        children: [
-          Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: .circle)),
-          if (showLabel)
-            Text(phase.label, style: TextStyle(color: color, fontSize: 12, fontWeight: .w600))
-          else if (latencyMs != null)
-            Text('${latencyMs}ms', style: TextStyle(color: color, fontSize: 11, fontWeight: .w600)),
-        ],
+    return Tooltip(
+      message: label,
+      child: Container(
+        padding: .symmetric(horizontal: showLabel ? 10 : 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.14),
+          borderRadius: .circular(999),
+          border: Border.all(color: color.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          mainAxisSize: .min,
+          spacing: 6,
+          children: [
+            Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: .circle)),
+            if (showLabel)
+              Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: .w600)),
+          ],
+        ),
       ),
     );
   }

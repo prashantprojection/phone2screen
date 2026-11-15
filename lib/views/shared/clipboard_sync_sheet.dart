@@ -6,7 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../models/clipboard_item.dart';
 import '../../providers/session_provider.dart';
 
-/// Modal bottom sheet to send clipboard text over DataChannel and copy history items.
+/// Modal bottom sheet to share text live between connected screens.
 class const ClipboardSyncSheet({super.key}) extends ConsumerStatefulWidget {
   static Future<void> show(BuildContext context) => showModalBottomSheet<void>(
     context: context,
@@ -68,12 +68,31 @@ class _ClipboardSyncSheetState extends ConsumerState<ClipboardSyncSheet> {
           crossAxisAlignment: .stretch,
           spacing: 12,
           children: [
-            Row(
-              spacing: 8,
+            Column(
+              crossAxisAlignment: .start,
+              spacing: 4,
               children: [
-                const Icon(Icons.content_paste_go_rounded, size: 20),
-                Expanded(child: Text('Clipboard Sync', style: theme.textTheme.titleMedium?.copyWith(fontWeight: .w700))),
-                IconButton(onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.close_rounded)),
+                Row(
+                  spacing: 8,
+                  children: [
+                    const Icon(Icons.content_paste_go_rounded, size: 20),
+                    Expanded(
+                      child: Text(
+                        'Share Text (Clipboard)',
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: .w700),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Close',
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+                Text(
+                  'Send links, notes, or passwords instantly between connected screens.',
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
               ],
             ),
             Row(
@@ -102,7 +121,9 @@ class _ClipboardSyncSheetState extends ConsumerState<ClipboardSyncSheet> {
               Padding(
                 padding: const .symmetric(vertical: 20),
                 child: Text(
-                  phase == .streaming ? 'No clipboard items exchanged yet.' : 'Connect a peer to sync clipboard.',
+                  phase == .streaming
+                      ? 'No shared text yet. Type or paste above to send.'
+                      : 'Connect a screen first to share text live.',
                   textAlign: .center,
                   style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),

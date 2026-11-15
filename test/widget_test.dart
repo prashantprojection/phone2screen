@@ -33,7 +33,11 @@ class const _FakePlatformService() extends PlatformDetectionService {
 class const _FakeNetworkAddressService() implements NetworkAddressService {
   @override
   Future<List<NetworkInterfaceInfo>> listInterfaces() async => const [
-    NetworkInterfaceInfo(name: 'Wi-Fi', address: '192.168.1.55', isPreferred: true),
+    NetworkInterfaceInfo(
+      name: 'Wi-Fi',
+      address: '192.168.1.55',
+      isPreferred: true,
+    ),
   ];
   @override
   Future<String> resolvePrimaryIp() async => '192.168.1.55';
@@ -63,6 +67,9 @@ class _FakeSignalingServerService implements SignalingServerService {
   final _messages = StreamController<SignalingMessage>.broadcast();
   final _events = StreamController<bool>.broadcast();
   int? _port;
+  int? _httpsPort;
+  WebCompanionMode _companionMode = .sendToReceiver;
+
   @override
   Stream<SignalingMessage> get messages => _messages.stream;
   @override
@@ -70,20 +77,36 @@ class _FakeSignalingServerService implements SignalingServerService {
   @override
   int? get boundPort => _port;
   @override
+  int? get boundHttpsPort => _httpsPort;
+  @override
+  WebCompanionMode get companionMode => _companionMode;
+  @override
   bool get isRunning => _port != null;
+
   @override
   Future<int> start({
     int preferredPort = 8080,
+    int? preferredHttpsPort = 8443,
+    WebCompanionMode companionMode = .sendToReceiver,
     required String sessionId,
     required String deviceName,
     String? pin,
-  }) async => _port = preferredPort == 0 ? 8080 : preferredPort;
+  }) async {
+    _httpsPort = preferredHttpsPort;
+    _companionMode = companionMode;
+    return _port = preferredPort == 0 ? 8080 : preferredPort;
+  }
+
   @override
   void send(SignalingMessage message) {}
   @override
   Future<void> disconnectClient([String reason = 'Host ended session']) async {}
   @override
-  Future<void> stop() async => _port = null;
+  Future<void> stop() async {
+    _port = null;
+    _httpsPort = null;
+  }
+
   @override
   Future<void> dispose() async {
     await _messages.close();
@@ -118,59 +141,84 @@ class _FakeSignalingClientService implements SignalingClientService {
 }
 
 void main() {
-  testWidgets('renders ReceiverScreen, switches to SenderScreen, opens SettingsScreen', (
-    tester,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(1200, 800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+  testWidgets(
+    'renders simplified Receiver, How to Use guide, Send tab, and Settings',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          platformServiceProvider.overrideWithValue(const _FakePlatformService()),
-          networkAddressServiceProvider.overrideWithValue(const _FakeNetworkAddressService()),
-          lanDiscoveryServiceProvider.overrideWith((ref) {
-            final s = _FakeLanDiscoveryService();
-            ref.onDispose(s.dispose);
-            return s;
-          }),
-          signalingServerServiceProvider.overrideWith((ref) {
-            final s = _FakeSignalingServerService();
-            ref.onDispose(s.dispose);
-            return s;
-          }),
-          signalingClientServiceProvider.overrideWith((ref) {
-            final s = _FakeSignalingClientService();
-            ref.onDispose(s.dispose);
-            return s;
-          }),
-        ],
-        child: const Phone2ScreenApp(),
-      ),
-    );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            platformServiceProvider.overrideWithValue(
+              const _FakePlatformService(),
+            ),
+            networkAddressServiceProvider.overrideWithValue(
+              const _FakeNetworkAddressService(),
+            ),
+            lanDiscoveryServiceProvider.overrideWith((ref) {
+              final s = _FakeLanDiscoveryService();
+              ref.onDispose(s.dispose);
+              return s;
+            }),
+            signalingServerServiceProvider.overrideWith((ref) {
+              final s = _FakeSignalingServerService();
+              ref.onDispose(s.dispose);
+              return s;
+            }),
+            signalingClientServiceProvider.overrideWith((ref) {
+              final s = _FakeSignalingClientService();
+              ref.onDispose(s.dispose);
+              return s;
+            }),
+          ],
+          child: const Phone2ScreenApp(),
+        ),
+      );
 
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.text('Phone2Screen'), findsOneWidget);
-    expect(find.textContaining('Ready to Receive'), findsOneWidget);
-    expect(find.text('192.168.1.55'), findsAtLeastNWidgets(1));
-    expect(find.text('http://192.168.1.55:8080'), findsAtLeastNWidgets(1));
+      expect(find.text('Phone2Screen'), findsOneWidget);
+      expect(find.text('Ready on Test Desktop'), findsOneWidget);
+      expect(find.text('192.168.1.55'), findsAtLeastNWidgets(1));
+      expect(find.textContaining('UDP 41234'), findsNothing);
 
-    await tester.tap(find.text('Send'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
+      final advancedDetails = find.text('Advanced Network Details');
+      await tester.ensureVisible(advancedDetails);
+      await tester.pumpAndSettle();
+      await tester.tap(advancedDetails);
+      await tester.pumpAndSettle();
+      expect(find.text('http://192.168.1.55:8080'), findsOneWidget);
 
-    expect(find.text('Broadcast Source'), findsOneWidget);
-    expect(find.text('Nearby Receivers'), findsOneWidget);
-    expect(find.text('Manual IP Connect'), findsOneWidget);
+      await tester.tap(find.byTooltip('How to Use'));
+      await tester.pumpAndSettle();
+      expect(find.text('How to Use Phone2Screen'), findsOneWidget);
+      expect(find.text('Phone to PC'), findsOneWidget);
+      expect(find.text('Watch in Any Browser'), findsOneWidget);
+      expect(find.text('Phone Browser to PC'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Settings'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 350));
+      await tester.tap(find.byTooltip('Close'));
+      await tester.pumpAndSettle();
+      expect(find.text('How to Use Phone2Screen'), findsNothing);
 
-    expect(find.text('Settings'), findsOneWidget);
-    expect(find.text('Stream Quality'), findsOneWidget);
-    expect(find.text('Eco Dim Preview'), findsOneWidget);
-  });
+      await tester.tap(find.text('Send'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text('What to Share'), findsOneWidget);
+      expect(find.text('Nearby Screens'), findsOneWidget);
+      expect(find.text('Cast to Web Browser'), findsOneWidget);
+      expect(find.text('Enter IP Manually'), findsOneWidget);
+      expect(find.textContaining('UDP 41234'), findsNothing);
+
+      await tester.tap(find.byTooltip('Settings'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Settings'), findsOneWidget);
+      expect(find.text('Video & Audio'), findsOneWidget);
+      expect(find.text('Battery Saver Preview'), findsOneWidget);
+      expect(find.text('How to Use Phone2Screen'), findsOneWidget);
+    },
+  );
 }

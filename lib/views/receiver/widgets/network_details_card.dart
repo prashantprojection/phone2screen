@@ -8,9 +8,11 @@ import '../../../models/signaling_data.dart';
 import '../../../providers/discovery_provider.dart';
 import '../../../providers/session_provider.dart';
 
-/// Displays LAN adapter selector and 1-tap copyable receiver endpoint fields.
-class const NetworkDetailsCard({super.key, required final SignalingData? endpoint})
-    extends ConsumerWidget {
+/// Displays Phone Browser shortcut card and collapsed Advanced Network Details.
+class const NetworkDetailsCard({
+  super.key,
+  required final SignalingData? endpoint,
+}) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
@@ -18,48 +20,139 @@ class const NetworkDetailsCard({super.key, required final SignalingData? endpoin
     final interfacesAsync = ref.watch(networkInterfacesProvider);
     final selectedIp = ref.watch(selectedIpProvider);
     final ep = endpoint;
+    final phoneBrowserUrl = ep?.httpsBrowserUrl ?? ep?.browserUrl;
 
-    return Card(
-      child: Padding(
-        padding: const .all(20),
-        child: Column(
-          crossAxisAlignment: .stretch,
-          spacing: 12,
-          children: [
-            Row(
-              spacing: 8,
+    return Column(
+      crossAxisAlignment: .stretch,
+      spacing: 12,
+      children: [
+        Card(
+          child: Padding(
+            padding: const .all(20),
+            child: Column(
+              crossAxisAlignment: .stretch,
+              spacing: 10,
               children: [
-                Icon(Icons.lan_rounded, size: 20, color: colors.primary),
-                Expanded(
-                  child: Text('Network & Connection', style: theme.textTheme.titleMedium?.copyWith(fontWeight: .w700)),
+                Row(
+                  spacing: 8,
+                  children: [
+                    Icon(
+                      Icons.language_rounded,
+                      size: 20,
+                      color: colors.primary,
+                    ),
+                    Expanded(
+                      child: Text(
+                        'No Phone App? Use Phone Browser',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: .w700,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                IconButton(
-                  onPressed: () => ref.invalidate(networkInterfacesProvider),
-                  icon: const Icon(Icons.refresh_rounded, size: 20),
-                  tooltip: 'Refresh interfaces',
+                _CopyableRow(
+                  label: ep?.httpsBrowserUrl != null
+                      ? 'Secure Browser Link'
+                      : 'Browser Link',
+                  value: phoneBrowserUrl,
+                  onCopy: (v) => _copy(context, 'browser link', v),
+                ),
+                Text(
+                  'Open on your phone browser to stream its camera; tap Advanced -> Proceed once.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
-            _buildAdapterPicker(context, interfacesAsync, selectedIp, (ip) {
-              ref.read(selectedIpProvider.notifier).selectIp(ip);
-              ref.read(sessionProvider.notifier).restartHosting();
-            }),
-            const Divider(height: 4),
-            _CopyableRow(label: 'IP Address', value: ep?.ip, onCopy: (v) => _copy(context, 'IP address', v)),
-            _CopyableRow(
-              label: 'Signaling Port',
-              value: ep != null ? '${ep.port}' : null,
-              onCopy: (v) => _copy(context, 'port', v),
-            ),
-            _CopyableRow(label: 'Session ID', value: ep?.sessionId, onCopy: (v) => _copy(context, 'session ID', v)),
-            _CopyableRow(
-              label: 'Web Companion URL',
-              value: ep?.browserUrl,
-              onCopy: (v) => _copy(context, 'Web Companion URL', v),
-            ),
-          ],
+          ),
         ),
-      ),
+        Card(
+          clipBehavior: .antiAlias,
+          child: Theme(
+            data: theme.copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              initiallyExpanded: false,
+              shape: const Border(),
+              collapsedShape: const Border(),
+              tilePadding: const .symmetric(horizontal: 20, vertical: 6),
+              childrenPadding: const .fromLTRB(20, 0, 20, 16),
+              leading: Icon(
+                Icons.tune_rounded,
+                size: 20,
+                color: colors.primary,
+              ),
+              title: Text(
+                'Advanced Network Details',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: .w700,
+                ),
+              ),
+              subtitle: ep != null
+                  ? Text(
+                      '${ep.ip} • Port ${ep.port}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    )
+                  : null,
+              children: [
+                Column(
+                  crossAxisAlignment: .stretch,
+                  spacing: 10,
+                  children: [
+                    Row(
+                      spacing: 8,
+                      children: [
+                        Expanded(
+                          child: _buildAdapterPicker(
+                            context,
+                            interfacesAsync,
+                            selectedIp,
+                            (ip) {
+                              ref.read(selectedIpProvider.notifier).selectIp(ip);
+                              ref
+                                  .read(sessionProvider.notifier)
+                                  .restartHosting();
+                            },
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () =>
+                              ref.invalidate(networkInterfacesProvider),
+                          icon: const Icon(Icons.refresh_rounded, size: 20),
+                          tooltip: 'Refresh interfaces',
+                        ),
+                      ],
+                    ),
+                    _CopyableRow(
+                      label: 'IP Address',
+                      value: ep?.ip,
+                      onCopy: (v) => _copy(context, 'IP address', v),
+                    ),
+                    _CopyableRow(
+                      label: 'Web Companion URL',
+                      value: ep?.browserUrl,
+                      onCopy: (v) => _copy(context, 'Web Companion URL', v),
+                    ),
+                    _CopyableRow(
+                      label: 'Port',
+                      value: ep != null ? '${ep.port}' : null,
+                      onCopy: (v) => _copy(context, 'port', v),
+                    ),
+                    _CopyableRow(
+                      label: 'Session ID',
+                      value: ep?.sessionId,
+                      onCopy: (v) => _copy(context, 'session ID', v),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -72,15 +165,30 @@ class const NetworkDetailsCard({super.key, required final SignalingData? endpoin
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     return interfacesAsync.when(
-      loading: () => Text('Scanning network interfaces...', style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
-      error: (_, _) => Text('Unable to enumerate network adapters.', style: theme.textTheme.bodySmall?.copyWith(color: AppColors.accentRed)),
+      loading: () => Text(
+        'Scanning network interfaces...',
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: colors.onSurfaceVariant,
+        ),
+      ),
+      error: (_, _) => Text(
+        'Unable to list network adapters.',
+        style: theme.textTheme.bodySmall?.copyWith(color: AppColors.accentRed),
+      ),
       data: (interfaces) {
         if (interfaces.isEmpty) {
-          return Text('No active IPv4 adapters found.', style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant));
+          return Text(
+            'No active IPv4 adapters found.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
+          );
         }
         final activeIp = interfaces.any((i) => i.address == selectedIp)
             ? selectedIp!
-            : (interfaces.where((i) => i.isPreferred).firstOrNull ?? interfaces.first).address;
+            : (interfaces.where((i) => i.isPreferred).firstOrNull ??
+                      interfaces.first)
+                  .address;
         return InputDecorator(
           decoration: const InputDecoration(
             labelText: 'Network Adapter',
@@ -95,7 +203,9 @@ class const NetworkDetailsCard({super.key, required final SignalingData? endpoin
                   DropdownMenuItem<String>(
                     value: item.address,
                     child: Text(
-                      item.isPreferred ? '${item.name} (${item.address}) • Recommended' : '${item.name} (${item.address})',
+                      item.isPreferred
+                          ? '${item.name} (${item.address}) • Recommended'
+                          : '${item.name} (${item.address})',
                       overflow: .ellipsis,
                     ),
                   ),
@@ -149,12 +259,27 @@ class const _CopyableRow({
                 crossAxisAlignment: .start,
                 spacing: 2,
                 children: [
-                  Text(label, style: theme.textTheme.labelSmall?.copyWith(color: colors.onSurfaceVariant)),
-                  Text(text ?? '--', overflow: .ellipsis, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: .w600)),
+                  Text(
+                    label,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                  Text(
+                    text ?? '--',
+                    overflow: .ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: .w600,
+                    ),
+                  ),
                 ],
               ),
             ),
-            Icon(Icons.copy_rounded, size: 18, color: enabled ? colors.primary : colors.onSurfaceVariant),
+            Icon(
+              Icons.copy_rounded,
+              size: 18,
+              color: enabled ? colors.primary : colors.onSurfaceVariant,
+            ),
           ],
         ),
       ),

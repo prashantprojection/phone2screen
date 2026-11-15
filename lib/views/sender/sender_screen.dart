@@ -9,11 +9,13 @@ import '../../providers/settings_provider.dart';
 import '../shared/error_banner.dart';
 import '../shared/video_stage_widget.dart';
 import 'widgets/active_sender_controls.dart';
+import 'widgets/desktop_source_dialog.dart';
 import 'widgets/manual_connect_sheet.dart';
 import 'widgets/nearby_devices_list.dart';
 import 'widgets/pin_prompt_dialog.dart';
 import 'widgets/qr_scanner_page.dart';
 import 'widgets/source_picker_card.dart';
+import 'widgets/web_broadcast_card.dart';
 
 /// Adaptive Sender view for discovering Receivers and broadcasting live video.
 class const SenderScreen({super.key}) extends ConsumerStatefulWidget {
@@ -43,6 +45,20 @@ class _SenderScreenState extends ConsumerState<SenderScreen> {
     await ref.read(sessionProvider.notifier).connectAndStream(target, pin: pin);
   }
 
+  Future<void> _startWebBroadcast() async {
+    final config = ref.read(streamConfigProvider);
+    final platform = ref.read(platformServiceProvider);
+    if (config.sourceType == .screen &&
+        platform.supportsDesktopPicker &&
+        config.desktopSourceId == null) {
+      final picked = await DesktopSourceDialog.show(context);
+      if (picked == null || !mounted) return;
+      ref.read(streamConfigProvider.notifier).setDesktopSourceId(picked.id);
+    }
+    if (!mounted) return;
+    await ref.read(sessionProvider.notifier).startWebBroadcast();
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(sessionProvider);
@@ -52,6 +68,10 @@ class _SenderScreenState extends ConsumerState<SenderScreen> {
         session.phase == .connecting ||
         session.phase == .streaming ||
         session.phase == .reconnecting;
+
+    if (session.isWebBroadcast && session.phase == .hosting) {
+      return WebBroadcastLobbyView(session: session);
+    }
 
     if (isLive) {
       return _buildLiveView(context, session, settings);
@@ -82,18 +102,17 @@ class _SenderScreenState extends ConsumerState<SenderScreen> {
                       icon: const Icon(Icons.qr_code_scanner_rounded),
                       label: const Text('Scan QR Code'),
                     ),
-                  if (platform.supportsQrScanner)
-                    OutlinedButton.icon(
-                      onPressed: () => ManualConnectSheet.show(context),
-                      icon: const Icon(Icons.dns_outlined),
-                      label: const Text('Manual IP Connect'),
-                    )
-                  else
+                  if (platform.canHostServer)
                     FilledButton.tonalIcon(
-                      onPressed: () => ManualConnectSheet.show(context),
-                      icon: const Icon(Icons.dns_outlined),
-                      label: const Text('Manual IP Connect'),
+                      onPressed: _startWebBroadcast,
+                      icon: const Icon(Icons.public_rounded),
+                      label: const Text('Cast to Web Browser'),
                     ),
+                  OutlinedButton.icon(
+                    onPressed: () => ManualConnectSheet.show(context),
+                    icon: const Icon(Icons.dns_outlined),
+                    label: const Text('Enter IP Manually'),
+                  ),
                 ],
               ),
               if (context.isExpanded)
@@ -129,8 +148,10 @@ class _SenderScreenState extends ConsumerState<SenderScreen> {
     final theme = Theme.of(context);
     final peerName =
         session.connectedPeerName ?? session.activeEndpoint?.deviceName ?? 'Receiver';
-    final telemetry = session.telemetry;
     final showEcoCard = settings.ecoDimPreview && session.phase == .streaming;
+    final statusColor = session.phase == .streaming
+        ? AppColors.accentGreen
+        : AppColors.accentOrange;
 
     return Center(
       child: ConstrainedBox(
@@ -147,19 +168,13 @@ class _SenderScreenState extends ConsumerState<SenderScreen> {
                   child: Row(
                     spacing: 10,
                     children: [
-                      const Icon(Icons.cast_connected_rounded, color: AppColors.accentGreen, size: 20),
+                      Icon(Icons.cast_connected_rounded, color: statusColor, size: 20),
                       Expanded(
                         child: Text(
                           peerName,
                           maxLines: 1,
                           overflow: .ellipsis,
                           style: theme.textTheme.titleSmall?.copyWith(fontWeight: .w700),
-                        ),
-                      ),
-                      Chip(
-                        visualDensity: .compact,
-                        label: Text(
-                          '${telemetry.latencyMs}ms • ${telemetry.bitrateMbps.toStringAsFixed(1)} Mbps',
                         ),
                       ),
                     ],
@@ -210,14 +225,14 @@ class const _EcoDimPreviewCard({required final VoidCallback onShowPreview})
             children: [
               const Icon(Icons.battery_saver_rounded, size: 48, color: AppColors.accentGreen),
               Text(
-                'Eco Dim Preview Active',
+                'Battery Saver Active',
                 style: theme.textTheme.titleMedium?.copyWith(
                   color: AppColors.textPrimaryDark,
                   fontWeight: .w700,
                 ),
               ),
               Text(
-                'Local video preview is unmounted during streaming to save battery and GPU on Tier-3 devices.',
+                'Preview is paused here to save battery and keep your phone cool. Your stream is still live!',
                 textAlign: .center,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: AppColors.textSecondaryDark,
@@ -226,7 +241,7 @@ class const _EcoDimPreviewCard({required final VoidCallback onShowPreview})
               OutlinedButton.icon(
                 onPressed: onShowPreview,
                 icon: const Icon(Icons.visibility_outlined),
-                label: const Text('Show Local Preview'),
+                label: const Text('Show Preview'),
               ),
             ],
           ),

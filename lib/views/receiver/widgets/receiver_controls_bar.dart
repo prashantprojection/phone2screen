@@ -6,7 +6,7 @@ import '../../../providers/session_provider.dart';
 import '../../../providers/settings_provider.dart';
 import '../../shared/clipboard_sync_sheet.dart';
 
-/// Receiver viewport controls for fit, rotation, mirror, audio, clipboard, and disconnect.
+/// Receiver viewport controls for fit, rotation, mirror, audio, text sharing, and disconnect.
 class const ReceiverControlsBar({super.key}) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -48,7 +48,7 @@ class const ReceiverControlsBar({super.key}) extends ConsumerWidget {
             ),
             _StageActionButton(
               icon: Icons.content_paste_go_rounded,
-              label: 'Clipboard',
+              label: 'Share Text',
               onPressed: () => ClipboardSyncSheet.show(context),
             ),
             _StageActionButton(

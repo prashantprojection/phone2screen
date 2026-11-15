@@ -12,13 +12,13 @@ import 'desktop_source_dialog.dart';
 typedef _QualityPreset = ({String label, StreamResolution res, int fps, int bps});
 
 const List<_QualityPreset> _presets = [
-  (label: '720p30', res: .p720, fps: 30, bps: StreamConstants.videoBitrate720p),
-  (label: '1080p30', res: .p1080, fps: 30, bps: StreamConstants.videoBitrate1080p),
-  (label: '1080p60', res: .p1080, fps: 60, bps: StreamConstants.videoBitrate1080p),
-  (label: '4K60', res: .p4k, fps: 60, bps: StreamConstants.videoBitrate4K),
+  (label: '720p Saver', res: .p720, fps: 30, bps: StreamConstants.videoBitrate720p),
+  (label: '1080p HD', res: .p1080, fps: 30, bps: StreamConstants.videoBitrate1080p),
+  (label: '1080p Smooth', res: .p1080, fps: 60, bps: StreamConstants.videoBitrate1080p),
+  (label: '4K Crisp', res: .p4k, fps: 60, bps: StreamConstants.videoBitrate4K),
 ];
 
-/// Sender media source, camera lens, audio, and quick resolution/FPS selector.
+/// Sender media source, camera lens, microphone, and quality preset picker.
 class const SourcePickerCard({super.key}) extends ConsumerStatefulWidget {
   @override
   ConsumerState<SourcePickerCard> createState() => _SourcePickerCardState();
@@ -64,27 +64,33 @@ class _SourcePickerCardState extends ConsumerState<SourcePickerCard> {
               spacing: 10,
               children: [
                 const Icon(Icons.tune_rounded, color: AppColors.primaryLight),
-                Text('Broadcast Source', style: theme.textTheme.titleMedium?.copyWith(fontWeight: .w700)),
+                Text(
+                  'What to Share',
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: .w700),
+                ),
               ],
             ),
             SegmentedButton<MediaSourceType>(
+              showSelectedIcon: false,
+              style: const ButtonStyle(
+                padding: WidgetStatePropertyAll(.symmetric(vertical: 14, horizontal: 16)),
+              ),
               segments: const [
-                ButtonSegment(value: .camera, icon: Icon(Icons.videocam_outlined), label: Text('Camera')),
-                ButtonSegment(value: .screen, icon: Icon(Icons.screen_share_outlined), label: Text('Screen')),
+                ButtonSegment(
+                  value: .camera,
+                  icon: Icon(Icons.videocam_outlined),
+                  label: Text('Camera'),
+                ),
+                ButtonSegment(
+                  value: .screen,
+                  icon: Icon(Icons.screen_share_outlined),
+                  label: Text('Screen'),
+                ),
               ],
               selected: {config.sourceType},
               onSelectionChanged: (s) => _onSourceChanged(s.first),
             ),
-            if (config.sourceType == .camera)
-              SegmentedButton<CameraLens>(
-                segments: const [
-                  ButtonSegment(value: .back, icon: Icon(Icons.camera_rear_outlined), label: Text('Back Lens')),
-                  ButtonSegment(value: .front, icon: Icon(Icons.camera_front_outlined), label: Text('Front Lens')),
-                ],
-                selected: {config.cameraLens},
-                onSelectionChanged: (s) => notifier.setCameraLens(s.first),
-              )
-            else if (supportsDesktopPicker)
+            if (config.sourceType == .screen && supportsDesktopPicker)
               Container(
                 padding: const .symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
@@ -98,7 +104,8 @@ class _SourcePickerCardState extends ConsumerState<SourcePickerCard> {
                     const Icon(Icons.desktop_windows_rounded, size: 18),
                     Expanded(
                       child: Text(
-                        _selectedSourceName ?? (config.desktopSourceId != null ? 'Source selected' : 'Default display'),
+                        _selectedSourceName ??
+                            (config.desktopSourceId != null ? 'Source selected' : 'Default display'),
                         maxLines: 1,
                         overflow: .ellipsis,
                       ),
@@ -107,14 +114,44 @@ class _SourcePickerCardState extends ConsumerState<SourcePickerCard> {
                   ],
                 ),
               ),
-            SwitchListTile(
-              contentPadding: .zero,
-              title: const Text('Include Audio'),
-              subtitle: const Text('Capture microphone audio with stream'),
-              value: config.enableAudio,
-              onChanged: notifier.setEnableAudio,
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (config.sourceType == .camera) ...[
+                  ChoiceChip(
+                    showCheckmark: false,
+                    avatar: const Icon(Icons.camera_rear_outlined, size: 18),
+                    label: const Text('Back'),
+                    selected: config.cameraLens == .back,
+                    onSelected: (_) => notifier.setCameraLens(.back),
+                  ),
+                  ChoiceChip(
+                    showCheckmark: false,
+                    avatar: const Icon(Icons.camera_front_outlined, size: 18),
+                    label: const Text('Front'),
+                    selected: config.cameraLens == .front,
+                    onSelected: (_) => notifier.setCameraLens(.front),
+                  ),
+                ],
+                FilterChip(
+                  showCheckmark: false,
+                  avatar: Icon(
+                    config.enableAudio ? Icons.mic_rounded : Icons.mic_off_rounded,
+                    size: 18,
+                  ),
+                  label: Text(config.enableAudio ? 'Mic On' : 'Mic Off'),
+                  selected: config.enableAudio,
+                  onSelected: notifier.setEnableAudio,
+                ),
+              ],
             ),
-            Text('Quality Preset', style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            Text(
+              'Quality',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
             Wrap(
               spacing: 8,
               runSpacing: 8,

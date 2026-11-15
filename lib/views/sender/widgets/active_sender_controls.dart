@@ -36,7 +36,6 @@ class const ActiveSenderControls({super.key}) extends ConsumerWidget {
     final platform = ref.watch(platformServiceProvider);
     final notifier = ref.read(sessionProvider.notifier);
     final isCamera = config.sourceType == .camera;
-    final telemetry = session.telemetry;
 
     return Card(
       child: Padding(
@@ -47,12 +46,6 @@ class const ActiveSenderControls({super.key}) extends ConsumerWidget {
           alignment: .center,
           crossAxisAlignment: .center,
           children: [
-            Chip(
-              avatar: const Icon(Icons.speed_rounded, size: 16, color: AppColors.cyanAccent),
-              label: Text(
-                '${telemetry.latencyMs}ms • ${telemetry.bitrateMbps.toStringAsFixed(1)} Mbps',
-              ),
-            ),
             if (isCamera)
               OutlinedButton.icon(
                 onPressed: notifier.switchCamera,
@@ -87,7 +80,7 @@ class const ActiveSenderControls({super.key}) extends ConsumerWidget {
             OutlinedButton.icon(
               onPressed: () => ClipboardSyncSheet.show(context),
               icon: const Icon(Icons.content_paste_go_rounded, size: 18),
-              label: const Text('Clipboard'),
+              label: const Text('Share Text'),
             ),
             FilledButton.icon(
               style: FilledButton.styleFrom(

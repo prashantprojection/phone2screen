@@ -19,7 +19,7 @@ class const ReceiverStreamingStage({
   @override
   Widget build(BuildContext context) {
     final waitingLabel = switch (session.phase) {
-      .connecting => 'Negotiating WebRTC stream...',
+      .connecting => 'Connecting live video...',
       .reconnecting => 'Reconnecting to sender...',
       _ => 'Waiting for video stream...',
     };

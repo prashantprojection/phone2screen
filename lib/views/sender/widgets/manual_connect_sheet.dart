@@ -67,9 +67,13 @@ class _ManualConnectSheetState extends ConsumerState<ManualConnectSheet> {
               Row(
                 mainAxisAlignment: .spaceBetween,
                 children: [
-                  Text('Manual IP Connect', style: theme.textTheme.titleLarge?.copyWith(fontWeight: .w700)),
+                  Text('Enter IP Manually', style: theme.textTheme.titleLarge?.copyWith(fontWeight: .w700)),
                   IconButton(onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.close_rounded)),
                 ],
+              ),
+              Text(
+                'Only needed if your Wi-Fi blocks automatic screen discovery.',
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
               TextFormField(
                 controller: _hostController,

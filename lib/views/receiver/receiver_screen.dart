@@ -34,7 +34,8 @@ class _ReceiverScreenState extends ConsumerState<ReceiverScreen> {
     final platform = ref.watch(platformServiceProvider);
     if (!platform.canHostServer) {
       return _WebUnsupportedNotice(
-        onSwitchToSender: () => ref.read(activeRoleProvider.notifier).setRole(.sender),
+        onSwitchToSender: () =>
+            ref.read(activeRoleProvider.notifier).setRole(.sender),
       );
     }
 
@@ -46,13 +47,23 @@ class _ReceiverScreenState extends ConsumerState<ReceiverScreen> {
       return ReceiverStreamingStage(
         session: session,
         display: display,
-        onExitFullscreen: () => ref.read(viewerDisplayProvider.notifier).setFullscreen(false),
+        onExitFullscreen: () =>
+            ref.read(viewerDisplayProvider.notifier).setFullscreen(false),
         onDismissError: () => ref.read(sessionProvider.notifier).clearError(),
       );
     }
 
     final theme = Theme.of(context);
-    final deviceName = session.activeEndpoint?.deviceName ?? 'Receiver';
+    final endpoint = session.activeEndpoint;
+    final heading = endpoint != null
+        ? 'Ready on ${endpoint.deviceName}'
+        : 'Ready to Receive';
+    final subtitle = endpoint != null || session.phase == .hosting
+        ? 'Open Phone2Screen on your phone and tap this screen — or scan the QR code.'
+        : (session.phase == .failed
+              ? 'Could not start receiving on Wi-Fi. Tap Retry below.'
+              : 'Preparing your Wi-Fi connection...');
+
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
@@ -65,21 +76,23 @@ class _ReceiverScreenState extends ConsumerState<ReceiverScreen> {
               if (session.errorMessage != null)
                 ErrorBanner(
                   message: session.errorMessage!,
-                  onRetry: () => ref.read(sessionProvider.notifier).restartHosting(),
-                  onDismiss: () => ref.read(sessionProvider.notifier).clearError(),
+                  onRetry: () =>
+                      ref.read(sessionProvider.notifier).restartHosting(),
+                  onDismiss: () =>
+                      ref.read(sessionProvider.notifier).clearError(),
                 ),
               Column(
                 crossAxisAlignment: .start,
                 spacing: 4,
                 children: [
                   Text(
-                    'Ready to Receive • $deviceName',
-                    style: theme.textTheme.headlineSmall?.copyWith(fontWeight: .w700),
+                    heading,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: .w700,
+                    ),
                   ),
                   Text(
-                    session.phase == .hosting
-                        ? 'Pair via QR code, LAN discovery on your phone, or open the Web Companion URL in any browser.'
-                        : 'Starting local LAN signaling server...',
+                    subtitle,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -88,13 +101,15 @@ class _ReceiverScreenState extends ConsumerState<ReceiverScreen> {
               ),
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final wide = context.isExpanded || constraints.maxWidth >= 860;
-                  final endpoint = session.activeEndpoint;
+                  final wide =
+                      context.isExpanded || constraints.maxWidth >= 860;
                   final pairingWidget = endpoint != null
                       ? QrPairingCard(endpoint: endpoint)
                       : _StartingHostCard(
                           phase: session.phase,
-                          onRetry: () => ref.read(sessionProvider.notifier).restartHosting(),
+                          onRetry: () => ref
+                              .read(sessionProvider.notifier)
+                              .restartHosting(),
                         );
                   final detailsWidget = NetworkDetailsCard(endpoint: endpoint);
                   if (wide) {
@@ -140,16 +155,22 @@ class const _WebUnsupportedNotice({
                 mainAxisSize: .min,
                 spacing: 14,
                 children: [
-                  const Icon(Icons.public_off_rounded, size: 44, color: AppColors.primaryLight),
-                  Text(
-                    'Browser Cannot Host Receiver',
-                    textAlign: .center,
-                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: .w700),
+                  const Icon(
+                    Icons.public_off_rounded,
+                    size: 44,
+                    color: AppColors.primaryLight,
                   ),
                   Text(
-                    'Web browsers cannot bind UDP discovery or HTTP signaling servers. '
-                    'Switch to Sender mode to cast this browser, or run Phone2Screen '
-                    'natively on Windows/Android to receive.',
+                    'Browser Cannot Receive Directly',
+                    textAlign: .center,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: .w700,
+                    ),
+                  ),
+                  Text(
+                    'Web browsers cannot host a Wi-Fi receiving screen. '
+                    'Switch to the Send tab to cast from here, or open '
+                    'Phone2Screen on Windows or Android to receive.',
                     textAlign: .center,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
@@ -158,7 +179,7 @@ class const _WebUnsupportedNotice({
                   FilledButton.icon(
                     onPressed: onSwitchToSender,
                     icon: const Icon(Icons.smartphone_rounded),
-                    label: const Text('Switch to Sender'),
+                    label: const Text('Switch to Send'),
                   ),
                 ],
               ),
@@ -183,19 +204,25 @@ class const _StartingHostCard({
           mainAxisSize: .min,
           spacing: 12,
           children: [
-            const Icon(Icons.wifi_tethering_rounded, size: 40, color: AppColors.primaryBlue),
+            const Icon(
+              Icons.wifi_tethering_rounded,
+              size: 40,
+              color: AppColors.primaryBlue,
+            ),
             Text(
               phase == .failed
-                  ? 'Receiver server failed to start'
-                  : 'Initializing receiver signaling...',
+                  ? 'Could not start Wi-Fi receiver'
+                  : 'Preparing Wi-Fi receiver...',
               textAlign: .center,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: .w600),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: .w600),
             ),
             if (phase == .failed)
               FilledButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Retry Hosting'),
+                label: const Text('Retry'),
               ),
           ],
         ),
