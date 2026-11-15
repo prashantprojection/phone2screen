@@ -88,22 +88,6 @@ Future<PreferencesStore> createDefaultStore() async {
     if (base != null && base.isNotEmpty) {
       return createFileStore('$base${sep}Phone2Screen${sep}preferences.json');
     }
-  } else if (Platform.isMacOS) {
-    final home = Platform.environment['HOME'];
-    if (home != null && home.isNotEmpty) {
-      return createFileStore(
-        '$home/Library/Application Support/Phone2Screen/preferences.json',
-      );
-    }
-  } else if (Platform.isLinux) {
-    final home = Platform.environment['HOME'];
-    final xdg = Platform.environment['XDG_CONFIG_HOME'];
-    final base = (xdg != null && xdg.isNotEmpty)
-        ? xdg
-        : (home != null && home.isNotEmpty ? '$home/.config' : null);
-    if (base != null) {
-      return createFileStore('$base/phone2screen/preferences.json');
-    }
   } else {
     final home = Platform.environment['HOME'];
     if (home != null && home.isNotEmpty) {

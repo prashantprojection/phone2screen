@@ -110,6 +110,32 @@ String sha256Hex(String input) {
   return sb.toString();
 }
 
+/// Computes a pure-Dart RFC 2104 HMAC-SHA256 digest for [key] and [message].
+Uint8List hmacSha256(List<int> key, List<int> message) {
+  const blockSize = 64;
+  final normalizedKey = key.length > blockSize ? sha256Bytes(key) : key;
+  final keyBlock = Uint8List(blockSize);
+  for (var i = 0; i < normalizedKey.length; i++) {
+    keyBlock[i] = normalizedKey[i] & 0xff;
+  }
+
+  final inner = Uint8List(blockSize + message.length);
+  for (var i = 0; i < blockSize; i++) {
+    inner[i] = keyBlock[i] ^ 0x36;
+  }
+  for (var i = 0; i < message.length; i++) {
+    inner[blockSize + i] = message[i] & 0xff;
+  }
+  final innerHash = sha256Bytes(inner);
+
+  final outer = Uint8List(blockSize + innerHash.length);
+  for (var i = 0; i < blockSize; i++) {
+    outer[i] = keyBlock[i] ^ 0x5c;
+  }
+  outer.setRange(blockSize, blockSize + innerHash.length, innerHash);
+  return sha256Bytes(outer);
+}
+
 /// Computes the OBS WebSocket v5 salted challenge authentication string.
 String computeObsWebSocketAuth({
   required String password,

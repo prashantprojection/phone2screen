@@ -7,8 +7,8 @@ import '../../models/shortcut_config.dart';
 import '../../providers/multi_cam_provider.dart';
 import '../../providers/platform_provider.dart';
 import '../../providers/session_provider.dart';
-import '../../providers/settings_provider.dart';
 import '../../providers/shortcut_provider.dart';
+import '../../providers/viewer_display_provider.dart';
 import '../receiver/widgets/remote_camera_panel.dart';
 import 'clipboard_sync_sheet.dart';
 import 'how_to_use_sheet.dart';
@@ -163,6 +163,10 @@ class _KeyboardShortcutsScopeState
           return true;
         }
         return false;
+      case .cycleBackgroundBlur:
+        if (!isReceiver || !isSessionActive) return false;
+        displayNotifier.cycleBokehMode();
+        return true;
     }
   }
 

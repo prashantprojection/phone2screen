@@ -48,4 +48,6 @@ app.*.map.json
 
 # Release archives & portable bundles
 *.zip
+*.sha256
+Phone2Screen-Setup-*.exe
 /dist/

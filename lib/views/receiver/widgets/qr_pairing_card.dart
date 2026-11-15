@@ -4,11 +4,29 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../models/signaling_data.dart';
 
-/// Receiver pairing card with status pills, QR code, and simple 3-step guide.
+/// Receiver pairing card with status pills, encrypted QR code, and 3-step guide.
 class const QrPairingCard({super.key, required final SignalingData endpoint})
-    extends StatelessWidget {
+    extends StatefulWidget {
+  @override
+  State<QrPairingCard> createState() => _QrPairingCardState();
+}
+
+class _QrPairingCardState extends State<QrPairingCard> {
+  // Cache the encrypted token because a random 12-byte nonce would otherwise
+  // regenerate the QR matrix and flicker on unrelated parent rebuilds.
+  late String _qrData = widget.endpoint.toQrString();
+
+  @override
+  void didUpdateWidget(covariant QrPairingCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.endpoint != widget.endpoint) {
+      _qrData = widget.endpoint.toQrString();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final endpoint = widget.endpoint;
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
@@ -45,40 +63,50 @@ class const QrPairingCard({super.key, required final SignalingData endpoint})
                           icon: Icons.lock_rounded,
                           label: 'PIN',
                           color: AppColors.accentOrange,
-                          bgColor: AppColors.accentOrange.withValues(
-                            alpha: 0.14,
-                          ),
-                          borderColor: AppColors.accentOrange.withValues(
-                            alpha: 0.35,
-                          ),
+                          bgColor: AppColors.accentOrange.withValues(alpha: 0.14),
+                          borderColor: AppColors.accentOrange.withValues(alpha: 0.35),
                         ),
                     ],
                   ),
                 ],
               ),
             ),
-            Container(
-              padding: const .all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: .circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primaryBlue.withValues(alpha: 0.20),
-                    blurRadius: 28,
-                    spreadRadius: 2,
+            Column(
+              mainAxisSize: .min,
+              spacing: 10,
+              children: [
+                Container(
+                  padding: const .all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: .circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primaryBlue.withValues(alpha: 0.20),
+                        blurRadius: 28,
+                        spreadRadius: 2,
+                      ),
+                      BoxShadow(
+                        color: AppColors.cyanAccent.withValues(alpha: 0.12),
+                        blurRadius: 14,
+                      ),
+                    ],
                   ),
-                  BoxShadow(
-                    color: AppColors.cyanAccent.withValues(alpha: 0.12),
-                    blurRadius: 14,
+                  child: QrImageView(
+                    key: ValueKey(_qrData),
+                    data: _qrData,
+                    size: 196,
+                    backgroundColor: Colors.white,
                   ),
-                ],
-              ),
-              child: QrImageView(
-                data: endpoint.toQrString(),
-                size: 196,
-                backgroundColor: Colors.white,
-              ),
+                ),
+                _SubtlePill(
+                  icon: Icons.enhanced_encryption_rounded,
+                  label: 'Encrypted • App-Only QR',
+                  color: AppColors.primaryBlue,
+                  bgColor: AppColors.primaryBlue.withValues(alpha: 0.12),
+                  borderColor: AppColors.primaryBlue.withValues(alpha: 0.35),
+                ),
+              ],
             ),
             Container(
               width: double.infinity,
@@ -101,7 +129,7 @@ class const QrPairingCard({super.key, required final SignalingData endpoint})
                   ),
                   _ConnectStepRow(
                     icon: Icons.qr_code_scanner_rounded,
-                    text: '3. Tap this screen or scan QR',
+                    text: '3. Tap this screen or scan in Phone2Screen',
                   ),
                 ],
               ),
@@ -121,9 +149,7 @@ class const _ReadyWifiPill() extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.accentGreen.withValues(alpha: 0.14),
         borderRadius: .circular(999),
-        border: Border.all(
-          color: AppColors.accentGreen.withValues(alpha: 0.38),
-        ),
+        border: Border.all(color: AppColors.accentGreen.withValues(alpha: 0.38)),
       ),
       child: Row(
         mainAxisSize: .min,
@@ -172,12 +198,12 @@ class const _SubtlePill({
         spacing: 5,
         children: [
           Icon(icon, size: 13, color: color),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: .w600,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: .ellipsis,
+              style: TextStyle(color: color, fontSize: 12, fontWeight: .w600),
             ),
           ),
         ],

@@ -1,11 +1,11 @@
 ---
 name: verify-phone2screen
-description: Verification runbook for Phone2Screen v0.4 with PowerShell checks for the <350-line file cap (.dart/.kt/.cpp/.h), banned Flutter Material/Cupertino/private-window imports and codegen packages, flutter analyze, flutter test, and flutter build windows --debug (including StudioBridge and p2s_vcam.dll Win32 C++).
+description: Verification runbook for Phone2Screen v0.5 with PowerShell checks for the <350-line file cap (.dart/.kt/.cpp/.h), banned Flutter Material/Cupertino/private-window imports and codegen packages, flutter analyze, flutter test (including v5 encrypted QR, Creator FX, Ring-Light & iOS USB ranking), and flutter build windows --debug (StudioBridge and p2s_vcam.dll Win32 C++).
 ---
 
-# Verify Phone2Screen (v0.4)
+# Verify Phone2Screen (v0.5)
 
-Run all steps from the workspace root (`d:\personal projects\phone2screen`) in Windows PowerShell. Never inspect, scan, or modify files outside this directory (test temporary files MUST reside under `.dart_tool/test_tmp_*` inside the workspace and be removed in `addTearDown`).
+Run all steps from the workspace root (`d:\personal projects\phone2screen`) in Windows PowerShell. Never inspect, scan, or modify files outside this directory (test temporary files MUST reside under `.dart_tool/test_tmp_*` inside the workspace and be removed in `addTearDown`). Active platform targets are Windows, Android, iOS (`Info.plist` App Store clean — no unused `voip` background mode), and Web (unused `linux/` and `macos/` directories deleted in v0.5).
 
 ## Gate 1: File Size Cap (`< 350` Lines for `.dart`, `.kt`, `.cpp` & `.h`)
 
@@ -50,7 +50,7 @@ flutter analyze --fatal-infos
 
 ## Gate 4: Unit & Widget Tests
 
-Run the full handwritten unit, loopback HTTP/WS, OBS WebSocket v5, USB bridge, audio/Windows studio, multi-cam, and widget test suite (including `v3_win_usb_audio_test.dart` and `v3_streamer_pro_test.dart`):
+Run the full handwritten unit, encrypted QR (`v5_qr_encryption_test.dart`), Creator FX / Selfie Ring-Light / iOS USB, loopback HTTP/WS, OBS WebSocket v5, USB bridge, audio/Windows studio, multi-cam, and widget test suite:
 
 ```powershell
 flutter test
@@ -58,7 +58,7 @@ flutter test
 
 ## Gate 5: Windows Desktop Build Check
 
-Verify the Windows desktop multi-window receiver, native Win32 C++ `StudioBridge`, and DirectShow virtual camera `p2s_vcam.dll` (`/W4 /WX`, `_HAS_EXCEPTIONS=0`) compile cleanly in debug mode (`build\windows\x64\runner\Debug\phone2screen.exe` + `p2s_vcam.dll`):
+Verify the Windows desktop multi-window receiver (`Phone2Screen` branding), native Win32 C++ `StudioBridge`, and DirectShow virtual camera `p2s_vcam.dll` (`/W4 /WX`, `_HAS_EXCEPTIONS=0`) compile cleanly in debug mode (`build\windows\x64\runner\Debug\phone2screen.exe` + `p2s_vcam.dll`):
 
 ```powershell
 flutter build windows --debug

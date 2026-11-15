@@ -8,6 +8,7 @@ import '../../../models/viewer_display_config.dart';
 import '../../../providers/multi_cam_provider.dart';
 import '../../../providers/session_provider.dart';
 import '../../../providers/settings_provider.dart';
+import 'creator_stage_fx_section.dart';
 import 'studio_look_audio_section.dart';
 
 /// Studio modal for remote phone camera control, aspect framing, and GPU color.
@@ -184,7 +185,7 @@ class _RemoteCameraPanelState extends ConsumerState<RemoteCameraPanel> {
                             trailing: TextButton.icon(
                               onPressed: () => isPrimary
                                   ? primaryNotifier.resetFramingAndColor()
-                                  : updateSecondary((c) => c.copyWith(aspectPreset: .free, digitalZoom: 1.0, panX: 0.0, panY: 0.0, brightness: 0.0, contrast: 1.0, saturation: 1.0, lookPreset: .natural, vignette: false)),
+                                  : updateSecondary((c) => c.resetLookAndFraming()),
                               style: TextButton.styleFrom(padding: const .symmetric(horizontal: 8, vertical: 4)),
                               icon: const Icon(Icons.restart_alt_rounded, size: 16),
                               label: const Text('Reset Studio Look'),
@@ -216,6 +217,11 @@ class _RemoteCameraPanelState extends ConsumerState<RemoteCameraPanel> {
                           for (final s in framingSliders)
                             StudioSliderRow(label: s.$1, valueText: s.$2, value: s.$3, min: s.$4, max: s.$5, onChanged: s.$6),
                         ],
+                      ),
+                      CreatorStageFxSection(
+                        isPrimary: isPrimary,
+                        display: display,
+                        onSecondaryDisplayUpdate: updateSecondary,
                       ),
                       StudioLookAudioSection(
                         isPrimary: isPrimary,

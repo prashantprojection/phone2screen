@@ -74,7 +74,32 @@ enum StudioLookPreset {
   };
 }
 
-/// Presentation, framing, color-grading, and audio options for the receiver stage.
+/// GPU portrait background blur levels layered around the subject center.
+enum PortraitBokehMode {
+  off,
+  soft,
+  strong;
+
+  String get label => switch (this) {
+    .off => 'Off',
+    .soft => 'Soft Bokeh',
+    .strong => 'Strong Blur',
+  };
+
+  double get sigma => switch (this) {
+    .off => 0.0,
+    .soft => 7.0,
+    .strong => 15.0,
+  };
+
+  PortraitBokehMode get next => switch (this) {
+    .off => .soft,
+    .soft => .strong,
+    .strong => .off,
+  };
+}
+
+/// Presentation, framing, color-grading, FX, and audio options for the receiver stage.
 class const ViewerDisplayConfig({
   final bool coverFit = false,
   final bool mirrored = false,
@@ -96,16 +121,28 @@ class const ViewerDisplayConfig({
   final double audioGain = 1.0,
   final int audioDelayMs = 0,
   final bool isVideoPaused = false,
+  final PortraitBokehMode bokehMode = .off,
+  final double faceFillLight = 0.0,
+  final bool deskCamMode = false,
+  final double keystoneVertical = 0.0,
+  final double keystoneHorizontal = 0.0,
 }) {
+  bool get hasColorMatrix =>
+      brightness != 0.0 || contrast != 1.0 || saturation != 1.0 || lookPreset != .natural;
+
   bool get hasColorAdjustments =>
-      brightness != 0.0 ||
-      contrast != 1.0 ||
-      saturation != 1.0 ||
-      lookPreset != .natural ||
-      vignette;
+      hasColorMatrix || vignette || bokehMode != .off || faceFillLight > 0.0;
 
   bool get hasFramingAdjustments =>
-      aspectPreset != .free || digitalZoom != 1.0 || panX != 0.0 || panY != 0.0;
+      aspectPreset != .free || digitalZoom != 1.0 || panX != 0.0 || panY != 0.0 ||
+      deskCamMode || keystoneVertical != 0.0 || keystoneHorizontal != 0.0;
+
+  ViewerDisplayConfig resetLookAndFraming() => copyWith(
+    aspectPreset: .free, digitalZoom: 1.0, panX: 0.0, panY: 0.0,
+    deskCamMode: false, keystoneVertical: 0.0, keystoneHorizontal: 0.0,
+    brightness: 0.0, contrast: 1.0, saturation: 1.0, lookPreset: .natural,
+    vignette: false, bokehMode: .off, faceFillLight: 0.0,
+  );
 
   /// Builds a 20-element 4x5 `ColorFilter.matrix` combining [lookPreset]
   /// followed by user BT.709 saturation, contrast, and brightness adjustments.
@@ -119,15 +156,11 @@ class const ViewerDisplayConfig({
   }
 
   List<double> get _userBcsMatrix {
-    const rw = 0.2126;
-    const gw = 0.7152;
-    const bw = 0.0722;
+    const rw = 0.2126, gw = 0.7152, bw = 0.0722;
     final invSat = 1.0 - saturation;
     final c = contrast;
     final offset = 128.0 * (1.0 - c) + brightness * 255.0;
-    final sr = rw * invSat;
-    final sg = gw * invSat;
-    final sb = bw * invSat;
+    final sr = rw * invSat, sg = gw * invSat, sb = bw * invSat;
     return <double>[
       c * (sr + saturation), c * sg, c * sb, 0, offset,
       c * sr, c * (sg + saturation), c * sb, 0, offset,
@@ -181,6 +214,11 @@ class const ViewerDisplayConfig({
     double? audioGain,
     int? audioDelayMs,
     bool? isVideoPaused,
+    PortraitBokehMode? bokehMode,
+    double? faceFillLight,
+    bool? deskCamMode,
+    double? keystoneVertical,
+    double? keystoneHorizontal,
   }) => ViewerDisplayConfig(
     coverFit: coverFit ?? this.coverFit,
     mirrored: mirrored ?? this.mirrored,
@@ -202,6 +240,11 @@ class const ViewerDisplayConfig({
     audioGain: audioGain ?? this.audioGain,
     audioDelayMs: audioDelayMs ?? this.audioDelayMs,
     isVideoPaused: isVideoPaused ?? this.isVideoPaused,
+    bokehMode: bokehMode ?? this.bokehMode,
+    faceFillLight: faceFillLight ?? this.faceFillLight,
+    deskCamMode: deskCamMode ?? this.deskCamMode,
+    keystoneVertical: keystoneVertical ?? this.keystoneVertical,
+    keystoneHorizontal: keystoneHorizontal ?? this.keystoneHorizontal,
   );
 
   @override
@@ -209,32 +252,30 @@ class const ViewerDisplayConfig({
       identical(this, other) ||
       other is ViewerDisplayConfig &&
           runtimeType == other.runtimeType &&
-          coverFit == other.coverFit &&
-          mirrored == other.mirrored &&
-          quarterTurns == other.quarterTurns &&
-          audioMuted == other.audioMuted &&
+          coverFit == other.coverFit && mirrored == other.mirrored &&
+          quarterTurns == other.quarterTurns && audioMuted == other.audioMuted &&
           isFullscreen == other.isFullscreen &&
           fullscreenHudVisible == other.fullscreenHudVisible &&
-          showTelemetry == other.showTelemetry &&
-          showGrid == other.showGrid &&
+          showTelemetry == other.showTelemetry && showGrid == other.showGrid &&
           aspectPreset == other.aspectPreset &&
           digitalZoom == other.digitalZoom &&
-          panX == other.panX &&
-          panY == other.panY &&
-          brightness == other.brightness &&
-          contrast == other.contrast &&
-          saturation == other.saturation &&
-          lookPreset == other.lookPreset &&
-          vignette == other.vignette &&
-          audioGain == other.audioGain &&
+          panX == other.panX && panY == other.panY &&
+          brightness == other.brightness && contrast == other.contrast &&
+          saturation == other.saturation && lookPreset == other.lookPreset &&
+          vignette == other.vignette && audioGain == other.audioGain &&
           audioDelayMs == other.audioDelayMs &&
-          isVideoPaused == other.isVideoPaused;
+          isVideoPaused == other.isVideoPaused &&
+          bokehMode == other.bokehMode && faceFillLight == other.faceFillLight &&
+          deskCamMode == other.deskCamMode &&
+          keystoneVertical == other.keystoneVertical &&
+          keystoneHorizontal == other.keystoneHorizontal;
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     coverFit, mirrored, quarterTurns, audioMuted, isFullscreen,
-    fullscreenHudVisible, showTelemetry, showGrid,
-    aspectPreset, digitalZoom, panX, panY, brightness, contrast,
-    saturation, lookPreset, vignette, audioGain, audioDelayMs, isVideoPaused,
-  );
+    fullscreenHudVisible, showTelemetry, showGrid, aspectPreset, digitalZoom,
+    panX, panY, brightness, contrast, saturation, lookPreset, vignette,
+    audioGain, audioDelayMs, isVideoPaused, bokehMode, faceFillLight,
+    deskCamMode, keystoneVertical, keystoneHorizontal,
+  ]);
 }

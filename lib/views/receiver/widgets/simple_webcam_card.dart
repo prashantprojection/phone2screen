@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../models/viewer_display_config.dart';
+import '../../../providers/settings_provider.dart';
 import '../../../providers/virtual_cam_provider.dart';
 
 /// Zero-OBS Windows DirectShow virtual webcam card surfaced in the Receiver lobby.
@@ -47,6 +49,9 @@ class _SimpleWebcamCardState extends ConsumerState<SimpleWebcamCard> {
   @override
   Widget build(BuildContext context) {
     final vcam = ref.watch(nativeVirtualCamProvider);
+    final PortraitBokehMode bokehMode = ref.watch(
+      viewerDisplayProvider.select((d) => d.bokehMode),
+    );
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final registered = vcam.isSupported && vcam.isRegistered;
@@ -126,6 +131,19 @@ class _SimpleWebcamCardState extends ConsumerState<SimpleWebcamCard> {
                 hPad: 9,
                 vPad: 4,
               ),
+            Tooltip(
+              message: 'Cycle Portrait Background Blur (B)',
+              child: FilterChip(
+                avatar: const Icon(Icons.blur_on_rounded, size: 15),
+                label: Text('Blur: ${bokehMode.label}'),
+                selected: bokehMode != .off,
+                showCheckmark: false,
+                visualDensity: .compact,
+                materialTapTargetSize: .shrinkWrap,
+                onSelected: (_) =>
+                    ref.read(viewerDisplayProvider.notifier).cycleBokehMode(),
+              ),
+            ),
           ],
         ),
       ],

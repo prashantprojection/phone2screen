@@ -31,7 +31,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   flutter::DartProject project(L"data");
   std::vector<std::string> args = GetCommandLineArguments();
 
-  std::wstring windowTitle = L"phone2screen";
+  std::wstring windowTitle = L"Phone2Screen";
   int windowOffset = 0;
   for (const auto& arg : args) {
     if (arg.rfind("--window-title=", 0) == 0 && arg.size() > 15) {

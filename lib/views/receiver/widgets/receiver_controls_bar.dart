@@ -97,6 +97,17 @@ class const ReceiverControlsBar({super.key}) extends ConsumerWidget {
                         onPressed: notifier.toggleMirror,
                       ),
                       _DockButton(
+                        icon: Icons.blur_on_rounded,
+                        label: compact ? null : 'Blur',
+                        tooltip: shortcuts.tooltipFor(
+                          'Background Blur: ${display.bokehMode.label}',
+                          .cycleBackgroundBlur,
+                        ),
+                        active: display.bokehMode != .off,
+                        accentColor: display.bokehMode != .off ? AppColors.cyanAccent : null,
+                        onPressed: notifier.cycleBokehMode,
+                      ),
+                      _DockButton(
                         icon: isPaused ? Icons.videocam_off_rounded : Icons.pause_circle_outline_rounded,
                         label: compact ? null : pauseLabel,
                         tooltip: shortcuts.tooltipFor(isPaused ? 'Resume Camera' : 'Pause Camera', .toggleVideoPause),

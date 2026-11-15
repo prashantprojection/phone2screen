@@ -13,11 +13,15 @@ final RegExp _ethernetPattern = RegExp(
 );
 
 /// Returns `true` when [name] or [address] identifies a physical USB-tethered
-/// network link (Android RNDIS/192.168.42.*, CDC/NCM, or Apple Mobile Device),
-/// excluding virtual/VPN tunnel adapters.
+/// network link (Android RNDIS/192.168.42.*, Apple iPhone Hotspot/172.20.10.*,
+/// Apple Mobile Device, or CDC/NCM), excluding virtual/VPN tunnel adapters.
 bool isUsbTetherInterface(String name, String address) {
   final lower = name.toLowerCase();
   if (_isVirtualAdapter(lower)) return false;
+  // Both Android RNDIS (192.168.42.x) and Apple iPhone USB Personal Hotspot
+  // (172.20.10.x / Apple Mobile Device Ethernet) rank at +550 (USB Wired)
+  // ahead of Wi-Fi (+300).
+  if (address.startsWith('172.20.10.')) return true;
   return lower.contains('rndis') ||
       lower.contains('usb') ||
       lower.contains('ncm') ||

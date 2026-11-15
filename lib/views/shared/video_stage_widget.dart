@@ -8,6 +8,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../models/viewer_display_config.dart';
+import 'video_stage_fx.dart';
 
 /// WebRTC [MediaStream] video stage with immediate srcObject binding, GPU
 /// framing transforms, BT.709 color grading, and optional Rule-of-Thirds grid.
@@ -101,10 +102,8 @@ class _VideoStageWidgetState extends State<VideoStageWidget> {
     final paused = widget.isPaused || config.isVideoPaused;
     return ClipRRect(
       borderRadius: .circular(widget.borderRadius),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: config.isFullscreen ? Colors.black : const Color(0xFF07080A),
-        ),
+      child: ColoredBox(
+        color: config.isFullscreen ? Colors.black : const Color(0xFF07080A),
         child: Stack(
           fit: .expand,
           children: [
@@ -134,74 +133,58 @@ class _VideoStageWidgetState extends State<VideoStageWidget> {
   }
 
   Widget _buildGradedStage(ViewerDisplayConfig config) {
-    Widget video = RotatedBox(
-      quarterTurns: config.quarterTurns % 4,
-      child: RTCVideoView(
-        _renderer,
-        mirror: config.mirrored,
-        objectFit: config.coverFit
-            ? .RTCVideoViewObjectFitCover
-            : .RTCVideoViewObjectFitContain,
-      ),
-    );
-
-    if (config.hasColorAdjustments) {
-      video = ColorFiltered(
-        colorFilter: ColorFilter.matrix(config.colorMatrix),
-        child: video,
+    Widget buildVideo() {
+      Widget video = RotatedBox(
+        quarterTurns: config.quarterTurns % 4,
+        child: RTCVideoView(
+          _renderer,
+          mirror: config.mirrored,
+          objectFit: config.coverFit ? .RTCVideoViewObjectFitCover : .RTCVideoViewObjectFitContain,
+        ),
       );
+      if (config.hasColorMatrix) {
+        video = ColorFiltered(colorFilter: ColorFilter.matrix(config.colorMatrix), child: video);
+      }
+      return video;
     }
 
+    var stage = buildPortraitBokehLayer(
+      mode: config.bokehMode,
+      sharpVideo: buildVideo(),
+      blurredSource: buildVideo(),
+    );
+    stage = applyDeskKeystoneTransform(config: config, child: stage);
+
     final zoom = config.digitalZoom.clamp(1.0, 3.0);
-    final hasTransform = zoom != 1.0 || config.panX != 0.0 || config.panY != 0.0;
-    Widget framed = hasTransform
+    final hasZoomPan = zoom != 1.0 || config.panX != 0.0 || config.panY != 0.0;
+    Widget framed = hasZoomPan
         ? LayoutBuilder(
             builder: (context, constraints) {
               // Allow subtle panning even at 1.0x crop while scaling range with zoom.
-              final maxShiftX = math.max(
-                constraints.maxWidth * 0.2,
-                constraints.maxWidth * (zoom - 1.0) / 2,
-              );
-              final maxShiftY = math.max(
-                constraints.maxHeight * 0.2,
-                constraints.maxHeight * (zoom - 1.0) / 2,
-              );
+              final maxShiftX = math.max(constraints.maxWidth * 0.2, constraints.maxWidth * (zoom - 1.0) / 2);
+              final maxShiftY = math.max(constraints.maxHeight * 0.2, constraints.maxHeight * (zoom - 1.0) / 2);
               final dx = config.panX.clamp(-1.0, 1.0) * maxShiftX;
               final dy = config.panY.clamp(-1.0, 1.0) * maxShiftY;
               return ClipRect(
                 child: Transform.translate(
                   offset: Offset(dx, dy),
-                  child: Transform.scale(scale: zoom, child: video),
+                  child: Transform.scale(scale: zoom, child: stage),
                 ),
               );
             },
           )
-        : ClipRect(child: video);
+        : ClipRect(child: stage);
 
     // Hide the framing grid whenever fullscreen HUD controls are hidden for clean capture.
     final showGrid = config.showGrid && !(config.isFullscreen && !config.fullscreenHudVisible);
-    if (config.vignette || showGrid) {
+    if (config.faceFillLight > 0.0 || config.vignette || showGrid) {
       framed = Stack(
         fit: .expand,
         children: [
           framed,
-          if (config.vignette)
-            IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    radius: 0.88,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.52),
-                    ],
-                    stops: const [0.58, 1.0],
-                  ),
-                ),
-              ),
-            ),
-          if (showGrid)
-            const IgnorePointer(child: CustomPaint(painter: _ThirdsGridPainter())),
+          if (config.faceFillLight > 0.0) FaceFillLightOverlay(intensity: config.faceFillLight),
+          if (config.vignette) const StageVignetteOverlay(),
+          if (showGrid) const StageThirdsGridOverlay(),
         ],
       );
     }
@@ -283,27 +266,3 @@ class const _StageSlate({
     );
   }
 }
-
-class _ThirdsGridPainter extends CustomPainter {
-  const _ThirdsGridPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white24
-      ..strokeWidth = 1.0
-      ..style = .stroke;
-
-    for (var i = 1; i <= 2; i++) {
-      final x = size.width * i / 3;
-      final y = size.height * i / 3;
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _ThirdsGridPainter oldDelegate) => false;
-}
-
-// Shared _StageSlate handles both waiting and privacy-paused slates below.

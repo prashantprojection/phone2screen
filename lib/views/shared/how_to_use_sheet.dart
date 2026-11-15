@@ -83,8 +83,8 @@ class const HowToUseSheet({super.key}) extends StatelessWidget {
                     subtitle: 'Simple Mode — DirectShow webcam for Zoom, Google Meet, Teams & Discord.',
                     steps: [
                       'Stay in Simple mode on PC Receive and click Enable Windows Webcam (no admin required).',
-                      'Connect your phone over Wi-Fi or USB, then select "Phone2Screen Camera" inside your call app.',
-                      'Press P (or tap Pause) anytime to freeze video with a privacy slate.',
+                      'Connect your phone over Wi-Fi, Encrypted QR, or USB, then pick "Phone2Screen Camera" in your call app.',
+                      'Tap Blur (or press B) for Portrait Background Blur and press P (or Pause) for the privacy slate.',
                     ],
                   ),
                   const _ScenarioCard(
@@ -94,8 +94,8 @@ class const HowToUseSheet({super.key}) extends StatelessWidget {
                     subtitle: 'Switch to Studio mode for OBS Window Capture, tally & multi-cam.',
                     steps: [
                       'Open Receive mode on PC (switch to Studio to click + Open Camera Window for extra phones).',
-                      'Open Send mode on your phone, pick a Rig Preset, and tap Connect or Scan QR Code.',
-                      'Press F for Fullscreen and tap (or press O) to hide controls for clean OBS Window Capture.',
+                      'Open Send on your phone, pick a Rig Preset, and tap your PC or Scan Encrypted App-Only QR (P2S1).',
+                      'Press F for Fullscreen, O to hide controls, or open Camera Rig (V) for Face Fill-Light & Desk Cam 180° + Keystone.',
                     ],
                   ),
                   const _ScenarioCard(
@@ -219,20 +219,20 @@ class const _QuickTipsCard() extends StatelessWidget {
 
     const tips = [
       (
+        Icons.qr_code_2_rounded,
+        'Encrypted App-Only QR (P2S1): Pairing QR codes are encrypted and authenticated so only Phone2Screen can scan them — normal camera apps cannot read your IP or port.',
+      ),
+      (
         Icons.usb_rounded,
-        'USB Zero-Lag: Enable phone USB Tethering (PC prioritizes USB NIC automatically) or run adb reverse tcp:8080 tcp:8080 and tap USB / ADB with the USB Ultra 20 Mbps preset.',
+        'iPhone & Android USB: On iPhone, plug in via USB and enable Personal Hotspot (PC prioritizes 172.20.10.* automatically). On Android, enable USB Tethering or plug in with USB debugging for auto adb reverse.',
+      ),
+      (
+        Icons.blur_on_rounded,
+        'Creator FX & Selfie Ring-Light: Press B (or tap Blur) for Portrait Background Blur, open Camera Rig (V) for Face Fill-Light & Desk Cam 180° + Keystone, or tap Ring Light on the live phone HUD.',
       ),
       (
         Icons.videocam_off_rounded,
-        'Privacy Pause (P): Press P or tap Pause anytime on Receiver or Sender to freeze video on a dark privacy slate (including Phone2Screen Camera).',
-      ),
-      (
-        Icons.live_tv_rounded,
-        'Simple vs Studio Mode: Use Simple for 1-click Windows Webcam (Zoom/Meet/Teams/Discord), or switch to Studio for /obs, OBS WebSocket tally & up to 4 phones.',
-      ),
-      (
-        Icons.fullscreen_rounded,
-        'Studio Controls: Press V for Camera Rig & Color grading, F for Fullscreen, O to hide controls (Esc exits), or customize keys in Settings.',
+        'Privacy Pause (P) & Controls: Press P to freeze on the privacy slate, F for Fullscreen, O to hide controls (Esc exits), or customize shortcuts in Settings.',
       ),
     ];
 

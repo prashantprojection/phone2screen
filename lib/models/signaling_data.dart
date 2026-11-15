@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../core/utils/qr_cipher.dart';
+
 /// Connection endpoint metadata exchanged via QR code or LAN UDP discovery.
 class const SignalingData({
   required final String ip,
@@ -34,11 +36,20 @@ class const SignalingData({
     );
   }
 
-  String toQrString() => jsonEncode(toJson());
+  /// Encrypts endpoint metadata into an authenticated app-only `P2S1.` QR token.
+  String toQrString({List<int>? nonceOverride}) => QrCipher.encryptPayload(
+    jsonEncode(toJson()),
+    nonceOverride: nonceOverride,
+  );
 
+  /// Decrypts and verifies an app-only `P2S1.` QR pairing token.
   factory SignalingData.fromQrString(String qrString) {
-    final json = jsonDecode(qrString) as Map<String, dynamic>;
-    return SignalingData.fromJson(json);
+    final decrypted = QrCipher.decryptPayload(qrString);
+    final decoded = jsonDecode(decrypted);
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Invalid QR payload: expected JSON object');
+    }
+    return SignalingData.fromJson(decoded);
   }
 
   @override

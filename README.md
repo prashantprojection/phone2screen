@@ -1,11 +1,13 @@
-# Phone2Screen v0.4
+# Phone2Screen v0.5
 
 **Phone2Screen** turns 1–4 phones into low-latency LAN or USB webcams and screen broadcasters for **Windows PC**, **Zoom / Google Meet / Teams / Discord**, **OBS Studio**, and **any Web Browser** — completely offline, with zero accounts, zero cloud servers, and zero watermarks.
 
 - **Zero-OBS Windows Webcam (`Phone2Screen Camera`)**: Built-in native DirectShow virtual webcam (`p2s_vcam.dll`) works out of the box in Zoom, Google Meet, Microsoft Teams, Discord, and OBS with 1-click per-user setup (no administrator privileges required).
+- **Encrypted App-Only QR Pairing (`P2S1`)**: Receiver pairing QR codes are encrypted and authenticated with `QrCipher` (pure-Dart HMAC-SHA256 keystream + MAC tag), so third-party QR scanners cannot read your local IP, port, or session metadata.
+- **Creator Stage FX & Selfie Ring-Light**: Toggle 1-tap **Portrait Background Blur (`B`)** (`Off` / `Soft Bokeh` / `Strong Blur`), brighten with **Face Fill-Light**, flip/level overhead shots with **Desk Cam 180° + 3D Perspective Keystone**, and light up dim rooms with the phone **Selfie Ring-Light** (`Off` / `Warm Ring` / `Daylight`).
 - **Simple & Studio Modes**: Start in **Simple** mode for plug-and-play webcam calls, or switch to **Studio** mode for multi-camera grids (`Solo` / `2-Up` / `4-Up`), multi-window desktop receivers, zero-UI OBS Browser Source (`/obs`), 1-click **OBS WebSocket v5** tally sync, and Studio Look color grading.
 - **Privacy Freeze-Frame (`P`) & Auto-Reconnect**: Press **`P`** (or **Pause**) on either PC or phone to replace the live feed with a frosted privacy slate and send a native virtual-cam privacy slate, plus sub-second (`650ms`) auto-reconnect on transient Wi-Fi or USB drops.
-- **Private & Offline**: Video travels peer-to-peer over Wi-Fi, mobile hotspot, USB tethering, or zero-config ADB USB cable.
+- **Private & Offline**: Video travels peer-to-peer over Wi-Fi, **iPhone USB Personal Hotspot** (`172.20.10.*`), Android USB tethering, or zero-config **ADB USB** cable.
 
 ---
 
@@ -15,13 +17,13 @@
 
 ### Option 1: Use Phone as PC Webcam — No OBS Required (`Simple` Mode)
 1. Open **Phone2Screen** on your Windows PC (starts in **Receive • Simple**).
-2. Click **Enable Windows Webcam** on the **Use as PC Webcam — No OBS Required** card (registers `Phone2Screen Camera` per-user with no admin prompt).
-3. Open **Phone2Screen** on your phone (**Send**), tap your PC (or connect via USB), and choose **Phone2Screen Camera** in **Zoom**, **Google Meet**, **Teams**, or **Discord**.
+2. Click **Enable Windows Webcam** on the **Use as PC Webcam — No OBS Required** card (registers `Phone2Screen Camera` per-user with no admin prompt), and optionally toggle **Blur** (`B`) right on the card.
+3. Open **Phone2Screen** on your phone (**Send**), tap your PC (or scan the encrypted QR), and choose **Phone2Screen Camera** in **Zoom**, **Google Meet**, **Teams**, or **Discord**.
 
 ### Option 2: Phone -> PC Studio & Multi-Cam (`Studio` Mode)
 1. Toggle **`Studio`** in the top bar or Receiver lobby header.
 2. Open **Phone2Screen** on your phone (**Send**), pick **Camera** or **Screen** + a **Rig Preset** (`Facecam 1080p60`, `USB Ultra`, etc.), and tap your PC (or **Scan QR Code**).
-3. Press **`F`** (Fullscreen) + **`O`** (Hide Controls) for clean capture, **`P`** to pause with the privacy slate, or click **`+ Open Camera Window`** for up to 4 phones.
+3. Press **`B`** for Portrait Background Blur, **`V`** for **Camera Rig** (Face Fill-Light, Desk Cam `180°` + Keystone, Studio Looks & Audio), **`F`** (Fullscreen) + **`O`** (Hide Controls) for clean capture, **`P`** for the privacy slate, or **`+ Open Camera Window`** for up to 4 phones.
 
 ### Option 3: Cast to Web Browser & OBS Studio (`/obs`)
 1. Open **Phone2Screen** on your phone (**Send**) -> choose **Camera** or **Screen** -> tap **Cast to Web Browser**.
@@ -46,11 +48,12 @@
 
 ---
 
-## Multi-Phone Grid, USB Plug-and-Play & Studio Tools
+## Multi-Phone Grid, USB Plug-and-Play & Creator Tools
 
 - **Single-Window Multi-Cam (`Solo` / `2-Up` / `4-Up`) & Multi-Window**: Primary Desktop Receivers accept up to **4 concurrent phone feeds** (`maxDesktopReceiverPeers = 4`), or launch isolated OS camera windows (`Camera 2..4` on ports `8081..8083`) via `DesktopWindowService`.
-- **Zero-Config USB Auto-Bridge (`adb reverse` + `/p2s-info`) & USB Tethering**: Desktop hosts auto-forward active ports over `adb reverse`; Senders probe `http://127.0.0.1:8080..8083/p2s-info` and surface `USB Wired • Zero-Latency` peers first. USB Tethering interfaces receive `+550` NIC priority.
-- **Studio Audio Routing, GPU Looks & OLED Tally**: Switch **Mic Mode** (`Voice Clean` vs `Studio Raw`), route to Windows **Virtual Audio Cables** (`Virtual Mic Ready`), boost audio (`0–200%`), align **Lip-Sync Offset (`0–500 ms`)**, apply 4x5 GPU **Studio Look Presets** + **Soft Vignette**, or enable true-black `#000000` **Battery Saver Preview** (`OledTallyView`).
+- **Android & iPhone USB Plug-and-Play**: Desktop hosts auto-forward active ports over `adb reverse` (`GET /p2s-info`) so Android USB cables surface `USB Wired • Zero-Latency` first; iPhone USB **Personal Hotspot** (`172.20.10.*` / Apple USB Ethernet) and Android RNDIS receive `+550` NIC priority automatically.
+- **Creator Stage FX & Sender Ring-Light**: Apply GPU **Portrait Background Blur** (`Off` / `Soft Bokeh` / `Strong Blur`), **Face Fill-Light**, **Desk Cam 180° + Vertical/Horizontal Keystone**, 4x5 **Studio Look Presets** + **Soft Vignette**, or toggle **Warm Ring** / **Daylight** **Selfie Ring-Light** on the Sender camera HUD (auto-hides in `#000000` **Battery Saver** OLED tally mode).
+- **Studio Audio Routing**: Switch **Mic Mode** (`Voice Clean` vs `Studio Raw`), route to Windows **Virtual Audio Cables** (`Virtual Mic Ready`), boost audio (`0–200%`), and align **Lip-Sync Offset (`0–500 ms`)**.
 
 ---
 
@@ -60,8 +63,9 @@ Customize every keybinding (or disable shortcuts) in **Settings → Keyboard Sho
 
 | Default Key | Action | What It Does |
 | --- | --- | --- |
+| `B` | Background Blur | Cycle GPU portrait background blur (`Off`, `Soft Bokeh`, `Strong Blur`) |
 | `P` | Pause Camera | Freeze or resume camera feed with privacy slate (`videoPause`) |
-| `V` | Camera Rig & Color | Open remote phone camera controls, Studio Looks, audio routing & lip-sync |
+| `V` | Camera Rig & Color | Open remote camera rig, Stage FX, Studio Looks, audio routing & lip-sync |
 | `F` | Fullscreen | Enter or exit fullscreen receiver stage |
 | `O` | Fullscreen Overlay | Show or hide fullscreen HUD controls |
 | `M` | Mute Audio | Mute or unmute receiver audio / sender mic |
@@ -76,7 +80,7 @@ Customize every keybinding (or disable shortcuts) in **Settings → Keyboard Sho
 
 ---
 
-## Windows Release Packaging (`v0.4.0`)
+## Windows Release Packaging (`v0.5.0`)
 
 Build the portable x64 `.zip` bundle (with SHA-256 checksum) and non-admin Inno Setup 6 installer (`windows/packaging/phone2screen.iss`, if `ISCC.exe` is installed):
 
@@ -84,21 +88,22 @@ Build the portable x64 `.zip` bundle (with SHA-256 checksum) and non-admin Inno 
 powershell -ExecutionPolicy Bypass -File scripts/package_windows.ps1
 ```
 
-Outputs are staged in `dist/` (`Phone2Screen-v0.4.0-Windows-x64.zip`, `.sha256`, and `Phone2Screen-Setup-v0.4.0.exe` when Inno Setup 6 is available). Pass `-SkipBuild` to package an existing Release build.
+Outputs are staged in `dist/` (`Phone2Screen-v0.5.0-Windows-x64.zip`, `.sha256`, and `Phone2Screen-Setup-v0.5.0.exe` when Inno Setup 6 is available). Pass `-SkipBuild` to package an existing Release build.
 
 ---
 
 ## Troubleshooting FAQ
 
 - **`Phone2Screen Camera` doesn't appear in Zoom/Meet/Discord?** Click **Enable Windows Webcam** in Phone2Screen (or run `scripts/setup_windows_webcam.ps1 -Action Register`), then restart your browser or call app so it rescans DirectShow devices.
-- **Devices don't appear under Nearby Screens?** Ensure both devices are on the same Wi-Fi (pause VPNs), allow Phone2Screen in Windows Firewall (UDP `41234`, TCP `8080–8083`, `8443`), plug in via USB debugging, or use **Enter IP Manually** / **USB / ADB**.
+- **External QR scanner can't open the QR code?** Pairing QR codes (`P2S1.`) are encrypted so only Phone2Screen's in-app **Scan QR Code** scanner can decode your local endpoint.
+- **Devices don't appear under Nearby Screens?** Ensure both devices are on the same Wi-Fi (pause VPNs), allow Phone2Screen in Windows Firewall (UDP `41234`, TCP `8080–8083`, `8443`), plug in via USB (Android USB debugging / Tethering or iPhone USB Personal Hotspot), or use **Enter IP Manually** / **USB / ADB**.
 - **OBS WebSocket won't connect?** Enable **Tools → WebSocket Server Settings** on port `4455` in OBS Studio 28+.
 
 ---
 
-## For Developers (`v0.4.0`)
+## For Developers (`v0.5.0`)
 
-Phone2Screen `0.4.0` is built with **Flutter 3.50**, **Dart 3.14**, **`package:material_ui`**, manual **Riverpod 3** (zero codegen), **`flutter_webrtc`**, a native Win32 C++ **`StudioBridge`**, and DirectShow **`p2s_vcam.dll`**.
+Phone2Screen `0.5.0+5` targets **Windows**, **Android**, **iOS**, and **Web** (unused `linux/` and `macos/` desktop runners were removed), built with **Flutter 3.50**, **Dart 3.14**, **`package:material_ui`**, manual **Riverpod 3** (zero codegen), **`flutter_webrtc`**, a native Win32 C++ **`StudioBridge`**, and DirectShow **`p2s_vcam.dll`**.
 
 - **Key Docs**: [AGENTS.md](AGENTS.md) • [flutter-350-conventions](.agents/skills/flutter-350-conventions/SKILL.md) • [webrtc-lan-protocol](.agents/skills/webrtc-lan-protocol/SKILL.md) • [verify-phone2screen](.agents/skills/verify-phone2screen/SKILL.md)
 

@@ -47,7 +47,11 @@ class _QrScannerPageState extends State<QrScannerPage> {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(
-            const SnackBar(content: Text('Invalid Phone2Screen QR code')),
+            const SnackBar(
+              content: Text(
+                'Invalid QR — scan an encrypted Phone2Screen pairing code',
+              ),
+            ),
           );
       }
     }
@@ -102,7 +106,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
                   border: Border.all(color: AppColors.borderDark),
                 ),
                 child: const Text(
-                  'Align the Receiver QR code inside the frame',
+                  'Align the encrypted Phone2Screen QR inside the frame',
                   textAlign: .center,
                   style: TextStyle(color: Colors.white, fontSize: 13),
                 ),

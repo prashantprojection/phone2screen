@@ -1,4 +1,4 @@
-# AGENTS.md — Phone2Screen v0.4
+# AGENTS.md — Phone2Screen v0.5
 
 AI agent context and engineering constraints for **Phone2Screen** (`com.example.phone2screen`), a LAN & USB WebRTC streamer webcam studio (Phone <-> PC Desktop, DirectShow Virtual Webcam, OBS Studio, and Web Browser).
 
@@ -15,7 +15,7 @@ AI agent context and engineering constraints for **Phone2Screen** (`com.example.
 - **Zero Code-Gen**: NEVER use `build_runner`, `freezed`, `json_serializable`, `riverpod_generator`, `riverpod_annotation`, `mockito`, `pigeon`, or `*.g.dart`. Write models, JSON serialization, and Riverpod 3 `Notifier` / `NotifierProvider` manually.
 - **Native Adaptive Layout**: Use `ResponsiveContext` (`lib/core/utils/responsive.dart`: `compact` / `medium` / `expanded` via `MediaQuery.sizeOf`) and `LayoutBuilder` — NEVER `flutter_screenutil`.
 - **File Size Cap (`< 350` LOC)**: Every `.dart`, `.kt`, `.cpp`, and `.h` file MUST stay strictly under 350 lines.
-- **Comment Complex Logic**: Keep concise why-comments on H.264 SDP munging, early ICE buffering, Android 14+ `MediaProjection` consent-before-FGS order, UDP `41234` USB/NIC ranking, and DataChannel RTT/`clipboard`/`cam_ctrl` sync.
+- **Comment Complex Logic**: Keep concise why-comments on H.264 SDP munging, early ICE buffering, Android 14+ `MediaProjection` consent-before-FGS order, UDP `41234` USB/NIC ranking, `QrCipher` crypto, and DataChannel RTT/`clipboard`/`cam_ctrl` sync.
 
 ## v0.2 Multi-Cam, Multi-Window & Studio Architecture
 
@@ -39,7 +39,7 @@ AI agent context and engineering constraints for **Phone2Screen** (`com.example.
   - Registers `MethodChannel('phone2screen/windows_studio')` wrapped by `WindowsStudioService` (`listVideoCaptureDevices` via DirectShow COM `CLSID_VideoInputDeviceCategory`, `listAudioOutputDevices` via WinMM `waveOutGetDevCapsW`, `setAlwaysOnTop`/`getAlwaysOnTop` via `WS_EX_TOPMOST`).
   - Compiled under MSVC `/W4 /WX` and `_HAS_EXCEPTIONS=0` (no `try`/`catch`/`throw` or `<comdef.h>`; wrap `<dshow.h>`/`<mmsystem.h>` in `#pragma warning(push, 3)`).
 - **OBS WebSocket v5 & Live Tally Sync (`ObsWebSocketService`, `ObsSyncNotifier`)**:
-  - Pure-Dart FIPS 180-4 SHA-256 (`lib/core/utils/sha256.dart`: `sha256Bytes`, `sha256Hex`, `computeObsWebSocketAuth`) drives OBS WebSocket v5 (`rpcVersion: 1`, `Hello -> Identify -> Identified`, virtual cam toggle, `CreateInput`/`SetInputSettings` for `"Phone2Screen Clean Feed"`, `SetInputAudioSyncOffset` in nanoseconds, and scene/item events).
+  - Pure-Dart FIPS 180-4 SHA-256 (`lib/core/utils/sha256.dart`: `sha256Bytes`, `sha256Hex`, `hmacSha256`, `computeObsWebSocketAuth`) drives OBS WebSocket v5 (`rpcVersion: 1`, `Hello -> Identify -> Identified`, virtual cam toggle, `CreateInput`/`SetInputSettings` for `"Phone2Screen Clean Feed"`, `SetInputAudioSyncOffset` in nanoseconds, and scene/item events).
   - `ObsSyncNotifier` and `MultiCamNotifier` broadcast `LiveTallyMessage` (`{"kind": "tally", "state": "program|preview|standby|off", "scene": "..."}`) over `phone2screen-control` (`DataChannelHelper`) to `SenderScreen` pills and `OledTallyView`.
 - **Studio Audio Routing & Mic DSP (`AudioRoutingService`, `AudioStudioNotifier`)**:
   - Enumerates WebRTC `audiooutput` endpoints with Win32 WaveOut fallback, tagging Virtual Audio Cables (`Virtual Mic Ready`), applying `0.0..2.0` stream boost (`Helper.setVolume`), `0..500 ms` lip-sync delay (synced to OBS + `/obs?delay=<ms>` Web Audio `DelayNode`), and live `Voice Clean` vs `Studio Raw` (`cam_ctrl.cmd == "voiceMode"`, `cam_state.voiceClean`).
@@ -59,7 +59,23 @@ AI agent context and engineering constraints for **Phone2Screen** (`com.example.
 - **Privacy Freeze-Frame (`P`) & Auto-Reconnect**:
   - `ShortcutAction.toggleVideoPause` (`P`) and `Pause` / `Resume` controls toggle `ViewerDisplayConfig.isVideoPaused` / `SessionState.isVideoPaused` and sync `RemoteCameraCommandType.videoPause` (`cam_ctrl` / `cam_state.videoPaused`) bidirectionally, overlaying a frosted `#EB0B0E14` `Camera Paused` privacy slate on `VideoStageWidget` and switching `p2s_vcam.dll` to state `2`.
   - `SessionSenderFlow` performs a 1-shot `650ms` auto-reconnect (`SessionPhase.reconnecting`, probing USB loopback first) on transient active-stream socket drops.
-- **Windows Release Packaging**: `scripts/package_windows.ps1` + `windows/packaging/phone2screen.iss` produce `dist/Phone2Screen-v0.4.0-Windows-x64.zip` (+ `.sha256`) and Inno Setup 6 non-admin `Phone2Screen-Setup-v0.4.0.exe`.
+- **Windows Release Packaging**: `scripts/package_windows.ps1` + `windows/packaging/phone2screen.iss` produce `dist/Phone2Screen-v0.5.0-Windows-x64.zip` (+ `.sha256`) and Inno Setup 6 non-admin `Phone2Screen-Setup-v0.5.0.exe`.
+
+## v0.5 Encrypted QR, Creator Stage FX, iOS USB & Cleanup
+
+- **Encrypted App-Only QR Pairing (`QrCipher`, `P2S1.`)**:
+  - `lib/core/utils/sha256.dart` provides RFC 2104 `hmacSha256`; `lib/core/utils/qr_cipher.dart` implements `QrCipher` (`P2S1.<base64url>` with 12-byte nonce, `P2S1-ENC`/`P2S1-MAC` key derivation, HMAC-SHA256 counter-mode XOR keystream, and constant-time 16-byte MAC verification).
+  - `SignalingData.toQrString`/`fromQrString` requires `P2S1.` and rejects cleartext JSON/URLs; `QrPairingCard` caches `_qrData` per endpoint and displays `Encrypted • App-Only QR`, while `QrScannerPage` rejects non-`P2S1` codes.
+- **GPU Portrait Bokeh, Face Fill-Light, Desk Keystone & `B` Shortcut**:
+  - `ViewerDisplayConfig` (`lib/providers/viewer_display_provider.dart`) adds `PortraitBokehMode` (`off`, `soft` sigma `7.0`, `strong` sigma `15.0`), `faceFillLight` (`0.0..1.0`), `deskCamMode` (180° flip), `keystoneVertical` / `keystoneHorizontal` (`-0.35..0.35`), and `resetLookAndFraming()`.
+  - `lib/views/shared/video_stage_fx.dart` renders `buildPortraitBokehLayer` (`ShaderMask` `dstIn` + `ImageFiltered`), `FaceFillLightOverlay`, and `applyDeskKeystoneTransform`.
+  - `ShortcutAction.cycleBackgroundBlur` (`B`) and UI controls in `SimpleWebcamCard`, `ReceiverControlsBar`, and `CreatorStageFxSection` (`RemoteCameraPanel`) control all FX live.
+- **Sender Selfie Ring-Light (`SelfieRingLightOverlay`)**:
+  - `lib/views/sender/widgets/selfie_ring_light_overlay.dart` exports `SelfieRingLightMode` (`off`, `warm` `#FFFFE4B5`, `daylight` `#FFF4F8FF`), `SelfieRingLightOverlay`, `LiveStatusPill`, `BatterySaverPill`, and `RingLightPill` in `SenderScreen` (camera mode only, hidden during `OledTallyView`).
+- **iOS USB Personal Hotspot, App Store `Info.plist` & Workspace Pruning**:
+  - `isUsbTetherInterface` (`network_address_io.dart`) ranks Apple iPhone USB Personal Hotspot (`172.20.10.*`, `'apple mobile device'`, `'iphone'`) at `+550` alongside Android RNDIS (`192.168.42.*`).
+  - `ios/Runner/Info.plist` sets `CFBundleDisplayName` to `Phone2Screen`, clarifies local-only privacy descriptions, and removes unused `voip` from `UIBackgroundModes` (keeping `audio`).
+  - Deleted unused `linux/` and `macos/` directories (active targets: Windows, Android, iOS, Web; `0.5.0+5`).
 
 ## Skills & Verification
 

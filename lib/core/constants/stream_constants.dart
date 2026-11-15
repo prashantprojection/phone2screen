@@ -1,4 +1,4 @@
-/// Network, discovery, signaling, and WebRTC defaults for Phone2Screen v0.1.
+/// Phone2Screen protocol, discovery, signaling, and WebRTC defaults.
 abstract final class StreamConstants {
   // Embedded HTTP static viewer + WebSocket signaling port range
   static const int defaultSignalingPort = 8080;

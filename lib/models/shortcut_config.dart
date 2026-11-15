@@ -13,7 +13,8 @@ enum ShortcutAction {
   openGuide,
   openCameraRig,
   disconnectStream,
-  toggleVideoPause;
+  toggleVideoPause,
+  cycleBackgroundBlur;
 
   /// Human-readable short title shown in settings and shortcut badges.
   String get label => switch (this) {
@@ -29,6 +30,7 @@ enum ShortcutAction {
     .openCameraRig => 'Camera Rig & Color',
     .disconnectStream => 'Stop / Disconnect',
     .toggleVideoPause => 'Pause Camera',
+    .cycleBackgroundBlur => 'Background Blur',
   };
 
   /// Concise description of what triggering this shortcut does.
@@ -45,6 +47,7 @@ enum ShortcutAction {
     .openCameraRig => 'Open remote phone camera and studio color controls',
     .disconnectStream => 'End the active stream session',
     .toggleVideoPause => 'Freeze or resume camera feed with privacy slate',
+    .cycleBackgroundBlur => 'Cycle portrait background blur (Off, Soft, Strong)',
   };
 }
 
@@ -150,6 +153,7 @@ const Map<ShortcutAction, ShortcutBinding> defaultShortcutBindings = {
   .openCameraRig: ShortcutBinding(keyId: 0x00000076, keyLabel: 'V'),
   .disconnectStream: ShortcutBinding(keyId: 0x00000078, keyLabel: 'X'),
   .toggleVideoPause: ShortcutBinding(keyId: 0x00000070, keyLabel: 'P'),
+  .cycleBackgroundBlur: ShortcutBinding(keyId: 0x00000062, keyLabel: 'B'),
 };
 
 /// Global keyboard shortcut preferences and action lookup configuration.
