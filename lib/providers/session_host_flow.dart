@@ -51,6 +51,7 @@ class SessionHostFlow {
       final server = ref.read(signalingServerServiceProvider);
       final port = await server.start(
         preferredPort: settings.preferredPort,
+        companionMode: .sendToReceiver,
         sessionId: sessionId,
         deviceName: deviceName,
         pin: pin.isEmpty ? null : pin,
@@ -60,6 +61,7 @@ class SessionHostFlow {
       final endpoint = SignalingData(
         ip: ip,
         port: port,
+        httpsPort: server.boundHttpsPort,
         sessionId: sessionId,
         deviceName: deviceName,
         requiresPin: pin.isNotEmpty,

@@ -1,11 +1,14 @@
+import '../../core/constants/stream_constants.dart';
 import '../../models/signaling_message.dart';
 import 'signaling_server_stub.dart'
     if (dart.library.io) 'signaling_server_io.dart'
     as impl;
+import 'web_companion_mode.dart';
 
-/// Embedded HTTP + WebSocket signaling server hosted by the Receiver device.
-/// Serves the Browser Web Companion at `GET /`, health info at `GET /health`,
-/// and single-peer JSON signaling at `GET /ws`.
+export 'web_companion_mode.dart';
+
+/// Embedded HTTP/HTTPS + WebSocket signaling server hosted for Receiver or
+/// Browser-Viewer modes (`GET /` Web Companion, `GET /health`, `GET /ws`).
 class SignalingServerService {
   SignalingServerService() : _impl = impl.SignalingServerImpl();
 
@@ -21,18 +24,28 @@ class SignalingServerService {
   /// TCP port the HTTP/WebSocket server is bound to, or `null` if stopped.
   int? get boundPort => _impl.boundPort;
 
+  /// TCP port the companion HTTPS/WSS server is bound to, or `null` if unused.
+  int? get boundHttpsPort => _impl.boundHttpsPort;
+
+  /// Active Browser Web Companion operating mode for `GET /`.
+  WebCompanionMode get companionMode => _impl.companionMode;
+
   /// Whether the signaling HTTP/WebSocket server is currently running.
   bool get isRunning => _impl.isRunning;
 
-  /// Starts the HTTP + `/ws` server on [preferredPort] (or the next free port
-  /// up to `StreamConstants.maxSignalingPort`, or ephemeral when `0`).
+  /// Starts HTTP + `/ws` (and companion HTTPS when available) on [preferredPort]
+  /// (`0` for ephemeral, or `preferredPort..maxSignalingPort`).
   Future<int> start({
     int preferredPort = 8080,
+    int? preferredHttpsPort = StreamConstants.defaultHttpsPort,
+    WebCompanionMode companionMode = .sendToReceiver,
     required String sessionId,
     required String deviceName,
     String? pin,
   }) => _impl.start(
     preferredPort: preferredPort,
+    preferredHttpsPort: preferredHttpsPort,
+    companionMode: companionMode,
     sessionId: sessionId,
     deviceName: deviceName,
     pin: pin,
@@ -45,7 +58,7 @@ class SignalingServerService {
   Future<void> disconnectClient([String reason = 'Host ended session']) =>
       _impl.disconnectClient(reason);
 
-  /// Disconnects any active client and closes the underlying `HttpServer`.
+  /// Disconnects any active client and closes the underlying servers.
   Future<void> stop() => _impl.stop();
 
   /// Stops the server and closes all broadcast streams.

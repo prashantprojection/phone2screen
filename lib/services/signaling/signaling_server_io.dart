@@ -1,20 +1,24 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import '../../core/constants/stream_constants.dart';
 import '../../models/signaling_message.dart';
-import 'web_viewer_page.dart';
+import 'signaling_port_binder.dart';
+import 'web_companion_mode.dart';
 
-/// Native `dart:io` HTTP + WebSocket signaling server with single-peer limit
-/// (`maxActivePeers = 1`), optional PIN auth, and Browser Web Companion.
+/// Native `dart:io` HTTP/HTTPS + WebSocket signaling server with single-peer
+/// limit (`maxActivePeers = 1`), optional PIN auth, and Web Companion modes.
 class SignalingServerImpl {
   final _messagesController = StreamController<SignalingMessage>.broadcast();
   final _connectionEventsController = StreamController<bool>.broadcast();
 
   HttpServer? _server;
+  HttpServer? _httpsServer;
   StreamSubscription<HttpRequest>? _serverSub;
+  StreamSubscription<HttpRequest>? _httpsServerSub;
   int? _boundPort;
+  int? _boundHttpsPort;
+  WebCompanionMode _companionMode = .sendToReceiver;
 
   String _sessionId = '';
   String _deviceName = 'Phone2Screen';
@@ -31,10 +35,16 @@ class SignalingServerImpl {
 
   int? get boundPort => _boundPort;
 
+  int? get boundHttpsPort => _boundHttpsPort;
+
+  WebCompanionMode get companionMode => _companionMode;
+
   bool get isRunning => _server != null;
 
   Future<int> start({
     int preferredPort = 8080,
+    int? preferredHttpsPort = StreamConstants.defaultHttpsPort,
+    WebCompanionMode companionMode = .sendToReceiver,
     required String sessionId,
     required String deviceName,
     String? pin,
@@ -46,19 +56,33 @@ class SignalingServerImpl {
       await stop();
     }
 
-    final server = await _bindPortRange(preferredPort);
+    final server = await bindHttpPortRange(preferredPort);
+    final effectiveHttpsPort =
+        preferredPort == 0 && preferredHttpsPort == StreamConstants.defaultHttpsPort
+        ? 0
+        : preferredHttpsPort;
+    final httpsServer = await tryBindHttpsPortRange(effectiveHttpsPort);
+
     if (_disposed) {
       await server.close(force: true);
+      await httpsServer?.close(force: true);
       throw StateError('SignalingServerService was disposed while starting.');
     }
 
     _server = server;
+    _httpsServer = httpsServer;
     _boundPort = server.port;
+    _boundHttpsPort = httpsServer?.port;
+    _companionMode = companionMode;
     _sessionId = sessionId;
     _deviceName = deviceName;
     _pin = pin?.trim() ?? '';
 
     _serverSub = server.listen(
+      (request) => unawaited(_handleRequest(request)),
+      onError: (_) {},
+    );
+    _httpsServerSub = httpsServer?.listen(
       (request) => unawaited(_handleRequest(request)),
       onError: (_) {},
     );
@@ -107,15 +131,20 @@ class SignalingServerImpl {
   Future<void> stop() async {
     await disconnectClient('Host stopped session');
     final sub = _serverSub;
+    final httpsSub = _httpsServerSub;
     _serverSub = null;
+    _httpsServerSub = null;
     await sub?.cancel();
+    await httpsSub?.cancel();
 
     final server = _server;
+    final httpsServer = _httpsServer;
     _server = null;
+    _httpsServer = null;
     _boundPort = null;
-    if (server != null) {
-      await server.close(force: true);
-    }
+    _boundHttpsPort = null;
+    if (server != null) await server.close(force: true);
+    if (httpsServer != null) await httpsServer.close(force: true);
   }
 
   Future<void> dispose() async {
@@ -126,70 +155,21 @@ class SignalingServerImpl {
     await _connectionEventsController.close();
   }
 
-  Future<HttpServer> _bindPortRange(int preferredPort) async {
-    if (preferredPort == 0) {
-      return HttpServer.bind(InternetAddress.anyIPv4, 0);
-    }
-
-    final startPort = preferredPort;
-    final endPort = preferredPort > StreamConstants.maxSignalingPort
-        ? preferredPort
-        : StreamConstants.maxSignalingPort;
-
-    SocketException? lastError;
-    for (var port = startPort; port <= endPort; port++) {
-      try {
-        return await HttpServer.bind(InternetAddress.anyIPv4, port);
-      } on SocketException catch (e) {
-        lastError = e;
-      }
-    }
-
-    throw StateError(
-      'Unable to bind signaling server on ports $startPort..$endPort: '
-      '${lastError?.message ?? 'unknown socket error'}',
-    );
-  }
-
   Future<void> _handleRequest(HttpRequest request) async {
     try {
-      final path = request.uri.path;
-      if (path == '/ws') {
+      if (request.uri.path == '/ws') {
         await _handleWebSocketUpgrade(request);
         return;
       }
-      if (path == '/health' && request.method == 'GET') {
-        request.response
-          ..statusCode = HttpStatus.ok
-          ..headers.contentType = ContentType.json
-          ..write(
-            jsonEncode({
-              'status': 'ok',
-              'sessionId': _sessionId,
-              'deviceName': _deviceName,
-              'requiresPin': _pin.isNotEmpty,
-            }),
-          );
-        await request.response.close();
-        return;
-      }
-      if (path == '/' && request.method == 'GET') {
-        request.response
-          ..statusCode = HttpStatus.ok
-          ..headers.contentType = ContentType.html
-          ..write(
-            buildWebCompanionHtml(
-              sessionId: _sessionId,
-              deviceName: _deviceName,
-              requiresPin: _pin.isNotEmpty,
-            ),
-          );
-        await request.response.close();
-        return;
-      }
-
-      request.response.statusCode = HttpStatus.notFound;
-      await request.response.close();
+      await serveSignalingHttpRequest(
+        request,
+        sessionId: _sessionId,
+        deviceName: _deviceName,
+        requiresPin: _pin.isNotEmpty,
+        mode: _companionMode,
+        httpPort: _boundPort ?? StreamConstants.defaultSignalingPort,
+        httpsPort: _boundHttpsPort,
+      );
     } catch (_) {
       try {
         await request.response.close();
@@ -218,7 +198,7 @@ class SignalingServerImpl {
     if (_activeSocket != null) {
       await _rejectSocket(
         socket,
-        message: 'Receiver is already in an active session',
+        message: 'Host is already in an active session',
       );
       return;
     }

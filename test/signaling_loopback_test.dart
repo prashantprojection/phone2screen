@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:phone2screen/models/signaling_data.dart';
 import 'package:phone2screen/models/signaling_message.dart';
@@ -148,5 +151,113 @@ void main() {
       ),
     );
     expect(client.isConnected, isFalse);
+  });
+
+  test('serves Web Companion HTML with HTTPS endpoint in sendToReceiver mode', () async {
+    final server = SignalingServerService();
+    final httpClient = HttpClient()
+      ..badCertificateCallback = (_, _, _) => true;
+
+    addTearDown(() async {
+      httpClient.close(force: true);
+      await server.dispose();
+    });
+
+    final port = await server.start(
+      preferredPort: 0,
+      companionMode: .sendToReceiver,
+      sessionId: 'web-tx-1',
+      deviceName: 'DesktopRx',
+    );
+    final httpsPort = server.boundHttpsPort;
+    expect(httpsPort, isNotNull);
+
+    final req = await httpClient.getUrl(Uri.parse('http://127.0.0.1:$port/'));
+    final resp = await req.close();
+    final body = await utf8.decodeStream(resp);
+    expect(resp.statusCode, HttpStatus.ok);
+    expect(body, contains('"mode":"sender"'));
+    expect(body, contains('"httpsPort":$httpsPort'));
+    expect(body, contains('Switch to Secure HTTPS'));
+
+    final tlsReq = await httpClient.getUrl(
+      Uri.parse('https://127.0.0.1:$httpsPort/health'),
+    );
+    final tlsResp = await tlsReq.close();
+    final tlsJson = jsonDecode(await utf8.decodeStream(tlsResp))
+        as Map<String, dynamic>;
+    expect(tlsResp.statusCode, HttpStatus.ok);
+    expect(tlsJson['sessionId'], 'web-tx-1');
+    expect(tlsJson['httpsPort'], httpsPort);
+    expect(tlsJson['mode'], 'sendToReceiver');
+  });
+
+  test('serves Viewer HTML and handles server-offer -> viewer-answer flow', () async {
+    final server = SignalingServerService();
+    final client = SignalingClientService();
+    final httpClient = HttpClient();
+    final serverMsgs = <SignalingMessage>[];
+    final clientMsgs = <SignalingMessage>[];
+
+    final sub1 = server.messages.listen(serverMsgs.add);
+    final sub2 = client.messages.listen(clientMsgs.add);
+
+    addTearDown(() async {
+      httpClient.close(force: true);
+      await sub1.cancel();
+      await sub2.cancel();
+      await client.dispose();
+      await server.dispose();
+    });
+
+    final port = await server.start(
+      preferredPort: 0,
+      preferredHttpsPort: null,
+      companionMode: .viewSenderStream,
+      sessionId: 'view-1',
+      deviceName: 'PhoneSender',
+    );
+    expect(server.boundHttpsPort, isNull);
+    expect(server.companionMode, WebCompanionMode.viewSenderStream);
+
+    final req = await httpClient.getUrl(Uri.parse('http://127.0.0.1:$port/'));
+    final resp = await req.close();
+    final html = await utf8.decodeStream(resp);
+    expect(resp.statusCode, HttpStatus.ok);
+    expect(html, contains('"mode":"viewer"'));
+    expect(html, contains('Watch Stream'));
+
+    await client.connect(
+      target: SignalingData(
+        ip: '127.0.0.1',
+        port: port,
+        sessionId: 'view-1',
+        deviceName: 'PhoneSender',
+      ),
+      clientDeviceName: 'Web Viewer',
+    );
+    await _waitUntil(() => clientMsgs.any((m) => m.type == .welcome));
+
+    server.send(
+      const SignalingMessage(
+        type: .offer,
+        sessionId: 'view-1',
+        payload: {'sdp': 'v=0 server-offer', 'type': 'offer'},
+      ),
+    );
+    await _waitUntil(() => clientMsgs.any((m) => m.type == .offer));
+
+    client.send(
+      const SignalingMessage(
+        type: .answer,
+        sessionId: 'view-1',
+        payload: {'sdp': 'v=0 viewer-answer', 'type': 'answer'},
+      ),
+    );
+    await _waitUntil(() => serverMsgs.any((m) => m.type == .answer));
+    expect(
+      serverMsgs.firstWhere((m) => m.type == .answer).payload['sdp'],
+      'v=0 viewer-answer',
+    );
   });
 }

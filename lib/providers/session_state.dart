@@ -13,6 +13,7 @@ class const SessionState({
   final SessionPhase phase = .idle,
   final SignalingData? activeEndpoint,
   final String? connectedPeerName,
+  final bool isWebBroadcast = false,
   final MediaStream? localStream,
   final MediaStream? remoteStream,
   final StreamTelemetry telemetry = const StreamTelemetry(),
@@ -26,12 +27,14 @@ class const SessionState({
     SessionPhase phase = .idle,
     SignalingData? activeEndpoint,
     String? connectedPeerName,
+    bool isWebBroadcast = false,
     String? errorMessage,
   }) {
     return SessionState(
       phase: phase,
       activeEndpoint: activeEndpoint,
       connectedPeerName: connectedPeerName,
+      isWebBroadcast: isWebBroadcast,
       clipboardHistory: clipboardHistory,
       errorMessage: errorMessage,
     );
@@ -42,6 +45,7 @@ class const SessionState({
     SessionPhase? phase,
     SignalingData? activeEndpoint,
     String? connectedPeerName,
+    bool? isWebBroadcast,
     MediaStream? localStream,
     MediaStream? remoteStream,
     StreamTelemetry? telemetry,
@@ -63,6 +67,7 @@ class const SessionState({
       connectedPeerName: clearPeerName
           ? null
           : (connectedPeerName ?? this.connectedPeerName),
+      isWebBroadcast: isWebBroadcast ?? this.isWebBroadcast,
       localStream: clearLocalStream ? null : (localStream ?? this.localStream),
       remoteStream: clearRemoteStream
           ? null

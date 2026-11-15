@@ -15,6 +15,7 @@ import 'session_host_flow.dart';
 import 'session_sender_flow.dart';
 import 'session_signaling_bridge.dart';
 import 'session_state.dart';
+import 'session_web_broadcast_flow.dart';
 import 'settings_provider.dart';
 
 export '../services/webrtc/media_capture_service.dart' show DesktopSourceItem;
@@ -44,6 +45,8 @@ class SessionNotifier extends Notifier<SessionState> implements SessionContext {
   final SessionSignalingBridge _bridge = SessionSignalingBridge();
   late final SessionSenderFlow _senderFlow = SessionSenderFlow(_bridge);
   late final SessionHostFlow _hostFlow = SessionHostFlow(_bridge, _senderFlow);
+  late final SessionWebBroadcastFlow _webBroadcastFlow =
+      SessionWebBroadcastFlow(_bridge, _senderFlow);
 
   bool _isHosting = false;
   String? _activeSessionId;
@@ -93,7 +96,9 @@ class SessionNotifier extends Notifier<SessionState> implements SessionContext {
         unawaited(
           prev == .receiver
               ? stopHosting()
-              : _senderFlow.teardown(this, .idle, stopListening: true),
+              : (_isHosting
+                    ? stopWebBroadcast()
+                    : _senderFlow.teardown(this, .idle, stopListening: true)),
         );
       }
     });
@@ -101,7 +106,7 @@ class SessionNotifier extends Notifier<SessionState> implements SessionContext {
       _,
       bps,
     ) {
-      if (!_isHosting &&
+      if ((!_isHosting || state.isWebBroadcast) &&
           (state.phase == .streaming || state.phase == .connecting)) {
         unawaited(webrtc.applyBitrateLimit(bps));
       }
@@ -121,6 +126,14 @@ class SessionNotifier extends Notifier<SessionState> implements SessionContext {
 
   /// Stops Receiver signaling server and UDP LAN broadcast.
   Future<void> stopHosting() => _hostFlow.stopHosting(this);
+
+  /// Hosts a local web viewer page so any browser on Wi-Fi can watch Sender.
+  Future<void> startWebBroadcast() =>
+      _webBroadcastFlow.startWebBroadcast(this);
+
+  /// Stops the Sender's local browser broadcast and releases camera/screen.
+  Future<void> stopWebBroadcast() =>
+      _webBroadcastFlow.stopWebBroadcast(this);
 
   /// Starts UDP LAN discovery listener for Sender mode.
   Future<void> startDiscovery() async {
@@ -214,6 +227,13 @@ class SessionNotifier extends Notifier<SessionState> implements SessionContext {
 
   /// Gracefully disconnects the active stream or stops hosting/discovery.
   Future<void> disconnect() async {
+    if (_isHosting && state.isWebBroadcast) {
+      await stopWebBroadcast();
+      if (ref.mounted && ref.read(activeRoleProvider) == .sender) {
+        await startDiscovery();
+      }
+      return;
+    }
     if (_isHosting) {
       final server = ref.read(signalingServerServiceProvider);
       if (state.phase == .streaming ||

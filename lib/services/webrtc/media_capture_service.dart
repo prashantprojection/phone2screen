@@ -102,9 +102,17 @@ class MediaCaptureService {
       _projectionServiceStarted = await _invokeProjection('startService');
     }
 
-    final videoConstraints = config.desktopSourceId != null
+    var effectiveSourceId = config.desktopSourceId;
+    if (_isNativeDesktop && effectiveSourceId == null) {
+      final screens = await desktopCapturer.getSources(
+        types: [SourceType.Screen],
+      );
+      effectiveSourceId = screens.firstOrNull?.id;
+    }
+
+    final videoConstraints = effectiveSourceId != null
         ? <String, dynamic>{
-            'deviceId': {'exact': config.desktopSourceId},
+            'deviceId': {'exact': effectiveSourceId},
           }
         : <String, dynamic>{
             'width': {'ideal': config.width},
@@ -135,17 +143,41 @@ class MediaCaptureService {
   Future<MediaStream> _startCameraCapture(
     StreamConfig config, {
     required bool captureAudio,
-  }) {
+  }) async {
     final facingMode = config.cameraLens == .front ? 'user' : 'environment';
-    return navigator.mediaDevices.getUserMedia({
-      'audio': captureAudio,
-      'video': {
-        'facingMode': facingMode,
-        'width': {'ideal': config.width},
-        'height': {'ideal': config.height},
-        'frameRate': {'ideal': config.frameRate},
-      },
-    });
+    final videoConstraints = <String, dynamic>{
+      if (!_isNativeDesktop) 'facingMode': {'ideal': facingMode},
+      'width': {'ideal': config.width},
+      'height': {'ideal': config.height},
+      'frameRate': {'ideal': config.frameRate},
+    };
+    try {
+      return await navigator.mediaDevices.getUserMedia({
+        'audio': captureAudio,
+        'video': videoConstraints,
+      });
+    } catch (_) {
+      if (captureAudio) {
+        try {
+          // Retry video-only when no microphone is attached or mic init fails.
+          return await navigator.mediaDevices.getUserMedia({
+            'audio': false,
+            'video': videoConstraints,
+          });
+        } catch (_) {}
+      }
+      try {
+        // Retry with minimal constraints for webcams that reject ideal sizing.
+        return await navigator.mediaDevices.getUserMedia({
+          'audio': false,
+          'video': true,
+        });
+      } catch (_) {
+        throw StateError(
+          'Unable to access camera. Check camera permissions or switch Broadcast Source to Screen.',
+        );
+      }
+    }
   }
 
   /// Toggles between front and back cameras on active camera streams.

@@ -166,21 +166,21 @@ class SessionSignalingBridge {
     );
   }
 
-  /// Routes an authenticated Receiver-side signaling message.
+  /// Routes an authenticated host-side signaling message (Receiver or Web Broadcast).
   Future<void> dispatchServerMessage(
     SignalingMessage msg, {
     required WebRtcSessionService webrtc,
     required SignalingServerService server,
     required String sessionId,
     required bool Function() isActive,
-    required void Function(String peerName) onHello,
+    required FutureOr<void> Function(String peerName) onHello,
     required Future<void> Function() onBye,
   }) async {
     if (!isActive()) return;
     switch (msg.type) {
       case .hello:
         final rawName = (msg.payload['deviceName'] as String?)?.trim();
-        onHello((rawName == null || rawName.isEmpty) ? 'Sender' : rawName);
+        await onHello((rawName == null || rawName.isEmpty) ? 'Sender' : rawName);
       case .offer:
         final sdp = msg.payload['sdp'] as String?;
         final type = (msg.payload['type'] as String?) ?? 'offer';
@@ -196,11 +196,16 @@ class SessionSignalingBridge {
             payload: {'sdp': answer.sdp, 'type': answer.type},
           ),
         );
+      case .answer:
+        final sdp = msg.payload['sdp'] as String?;
+        final type = (msg.payload['type'] as String?) ?? 'answer';
+        if (sdp == null || sdp.isEmpty) return;
+        await webrtc.applyRemoteAnswer(RTCSessionDescription(sdp, type));
       case .ice:
         await _applyIcePayload(msg.payload, webrtc);
       case .bye:
         await onBye();
-      case .welcome || .answer || .error:
+      case .welcome || .error:
         break;
     }
   }

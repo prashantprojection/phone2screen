@@ -55,5 +55,7 @@ Phone2Screen operates completely offline on a local network (Wi-Fi, Ethernet, US
 
 ## 6. Browser Web Companion (`GET /`)
 
-- Any desktop or mobile browser on the LAN can open `http://<ip>:<port>` (or scan the QR URL/JSON) to view or interact with the stream without installing the native app.
-- Uses native browser `WebSocket`, `RTCPeerConnection`, `<video autoplay playsinline>`, and the `phone2screen-control` DataChannel with matching early ICE buffering and `ping`/`pong` + `clipboard` handling.
+- Any desktop or mobile browser on the LAN can open the companion URL to interact with Phone2Screen without installing the native app, operating in two `WebCompanionMode` modes:
+  - `sendToReceiver` (Receiver hosts `http://<ip>:8080` + companion TLS `https://<ip>:8443`): Browser captures camera/screen (`getUserMedia`/`getDisplayMedia` require a Secure Context, so plain `http://<lan-ip>` automatically prompts to switch to `https://<lan-ip>:8443` or `http://localhost:8080`), creates the WebRTC `offer`, and streams to Receiver.
+  - `viewSenderStream` (Sender hosts **Cast to Web Browser** on plain `http://<ip>:8080`): Browser connects `/ws`, receives the Sender's WebRTC `offer`, replies `answer`, and watches live `<video autoplay playsinline>` over plain HTTP on any LAN browser with zero HTTPS requirement and zero Tier-3 transcoding overhead.
+- Both modes use native browser `WebSocket`, `RTCPeerConnection` (preferring H.264), early ICE buffering, and the `phone2screen-control` DataChannel (`ping`/`pong` RTT + bidirectional `clipboard`).

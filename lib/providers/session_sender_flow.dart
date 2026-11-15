@@ -110,7 +110,11 @@ class SessionSenderFlow {
       source == .screen ? desktopSourceId : null,
     );
     final phase = ctx.currentState.phase;
-    if (phase != .streaming && phase != .connecting) return;
+    final activeCapture =
+        phase == .streaming ||
+        phase == .connecting ||
+        (ctx.currentState.isWebBroadcast && phase == .hosting);
+    if (!activeCapture) return;
 
     final epoch = ctx.epoch;
     try {

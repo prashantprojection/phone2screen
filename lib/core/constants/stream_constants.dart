@@ -4,6 +4,10 @@ abstract final class StreamConstants {
   static const int defaultSignalingPort = 8080;
   static const int maxSignalingPort = 8095;
 
+  // Embedded HTTPS companion port range (unlocks browser getUserMedia on LAN)
+  static const int defaultHttpsPort = 8443;
+  static const int maxHttpsPort = 8458;
+
   // LAN UDP broadcast discovery
   static const int udpDiscoveryPort = 41234;
   static const String discoveryMagic = 'P2S_V1';
