@@ -37,6 +37,7 @@ Send your phone's camera straight into the Phone2Screen PC app using just Safari
 ## Handy Controls & Tips
 
 - **Switch Camera or Screen Live**: While streaming, tap **Flip** (front/back camera), **Screen / Camera** to switch live without hanging up, **Mute / Unmute**, or **Torch** (phone flashlight). On the receiving screen, use **Fit / Fill**, **Rotate**, **Mirror**, or **Fullscreen**.
+- **Immersive Fullscreen & Keyboard Shortcuts**: In **Fullscreen**, press `Esc` to exit or tap the video (or click **Hide Controls**) to clear overlays. Customize **Keyboard Shortcuts** in **Settings → Keyboard Shortcuts** (defaults: `F` Fullscreen, `O` Toggle Overlay, `M` Mute, `R` Rotate, `H` Mirror, `Z` Fit/Fill, `S` Stats, `C` Share Text, `G` Guide, `X` Disconnect).
 - **Share Text (Clipboard Sync)**: Tap **Share Text** during any session to send website links, notes, or passwords back and forth between devices in one tap. Turn on **Auto-Copy Shared Text** in **Settings → Advanced & Security** to copy incoming text straight to your clipboard.
 - **Battery Saver Preview**: Turn on **Battery Saver Preview** in **Settings → Video & Audio** to pause the preview video on your sending device while streaming — keeping your phone cool and saving battery while your stream stays live.
 - **No Wi-Fi? Use Your Phone Hotspot**: Turn on your phone's Personal Hotspot and connect your PC or TV to it. Phone2Screen streams directly across that local connection — **it works offline and uses zero mobile data!**

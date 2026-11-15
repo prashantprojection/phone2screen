@@ -7,6 +7,7 @@ import '../../core/utils/responsive.dart';
 import '../../models/stream_config.dart';
 import '../../providers/settings_provider.dart';
 import '../shared/how_to_use_sheet.dart';
+import 'widgets/shortcut_settings_card.dart';
 
 /// Application settings screen for theme, video & audio, security, and help.
 class const SettingsScreen({super.key}) extends ConsumerWidget {
@@ -97,6 +98,13 @@ class const SettingsScreen({super.key}) extends ConsumerWidget {
                   ],
                 ),
               ),
+              const SizedBox(height: 16),
+              _sectionHeader(
+                theme,
+                Icons.keyboard_alt_outlined,
+                'Keyboard Shortcuts',
+              ),
+              const ShortcutSettingsCard(),
               const SizedBox(height: 16),
               Card(
                 clipBehavior: .antiAlias,

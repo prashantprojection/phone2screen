@@ -5,6 +5,7 @@ import '../../../models/viewer_display_config.dart';
 import '../../../providers/session_provider.dart';
 import '../../shared/error_banner.dart';
 import '../../shared/video_stage_widget.dart';
+import 'fullscreen_stage_view.dart';
 import 'receiver_controls_bar.dart';
 import 'telemetry_overlay.dart';
 
@@ -18,55 +19,19 @@ class const ReceiverStreamingStage({
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    if (display.isFullscreen) {
+      return FullscreenStageView(
+        session: session,
+        display: display,
+        onExitFullscreen: onExitFullscreen,
+      );
+    }
+
     final waitingLabel = switch (session.phase) {
       .connecting => 'Connecting live video...',
       .reconnecting => 'Reconnecting to sender...',
       _ => 'Waiting for video stream...',
     };
-
-    if (display.isFullscreen) {
-      return ColoredBox(
-        color: Colors.black,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: VideoStageWidget(
-                stream: session.remoteStream,
-                displayConfig: display,
-                borderRadius: 0,
-                waitingLabel: waitingLabel,
-              ),
-            ),
-            SafeArea(
-              child: Padding(
-                padding: const .all(16),
-                child: Stack(
-                  children: [
-                    if (display.showTelemetry)
-                      Align(
-                        alignment: Alignment.topLeft,
-                        child: TelemetryOverlay(telemetry: session.telemetry),
-                      ),
-                    Align(
-                      alignment: Alignment.bottomCenter,
-                      child: FilledButton.tonalIcon(
-                        onPressed: onExitFullscreen,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.backgroundDark.withValues(alpha: 0.78),
-                          foregroundColor: AppColors.textPrimaryDark,
-                        ),
-                        icon: const Icon(Icons.fullscreen_exit_rounded),
-                        label: const Text('Exit Fullscreen'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
 
     return Column(
       children: [

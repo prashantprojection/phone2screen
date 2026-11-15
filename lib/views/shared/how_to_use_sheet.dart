@@ -213,6 +213,10 @@ class const _QuickTipsCard() extends StatelessWidget {
         'No Wi-Fi? Turn on your phone hotspot and connect your PC — it works offline with zero mobile data.',
       ),
       (Icons.content_paste_go_rounded, 'Share Text: Send links, notes, or passwords live between connected screens.'),
+      (
+        Icons.fullscreen_rounded,
+        'Fullscreen & Shortcuts: Tap the video in fullscreen (or click Hide Controls) to clear the screen, press Esc anytime to exit fullscreen, and customize keyboard shortcuts in Settings.',
+      ),
     ];
 
     return Container(

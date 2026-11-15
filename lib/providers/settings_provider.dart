@@ -159,12 +159,28 @@ class ViewerDisplayNotifier extends Notifier<ViewerDisplayConfig> {
   /// Mutes or unmutes receiver playback audio.
   void toggleMute() => state = state.copyWith(audioMuted: !state.audioMuted);
 
-  /// Toggles immersive fullscreen receiver display.
-  void toggleFullscreen() =>
-      state = state.copyWith(isFullscreen: !state.isFullscreen);
+  /// Toggles immersive fullscreen receiver display, revealing HUD controls on entry.
+  void toggleFullscreen() {
+    final next = !state.isFullscreen;
+    state = state.copyWith(
+      isFullscreen: next,
+      fullscreenHudVisible: next ? true : state.fullscreenHudVisible,
+    );
+  }
 
-  /// Explicitly sets immersive fullscreen state.
-  void setFullscreen(bool value) => state = state.copyWith(isFullscreen: value);
+  /// Explicitly sets immersive fullscreen state, revealing HUD controls on entry.
+  void setFullscreen(bool value) => state = state.copyWith(
+    isFullscreen: value,
+    fullscreenHudVisible: value ? true : state.fullscreenHudVisible,
+  );
+
+  /// Shows or hides floating overlay controls while in fullscreen.
+  void toggleFullscreenHud() =>
+      state = state.copyWith(fullscreenHudVisible: !state.fullscreenHudVisible);
+
+  /// Explicitly shows or hides floating overlay controls while in fullscreen.
+  void setFullscreenHudVisible(bool visible) =>
+      state = state.copyWith(fullscreenHudVisible: visible);
 
   /// Shows or hides live telemetry overlay chips.
   void toggleTelemetry() =>

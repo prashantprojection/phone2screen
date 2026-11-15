@@ -191,7 +191,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('http://192.168.1.55:8080'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('How to Use'));
+      await tester.tap(find.byTooltip('How to Use (G)'));
       await tester.pumpAndSettle();
       expect(find.text('How to Use Phone2Screen'), findsOneWidget);
       expect(find.text('Phone to PC'), findsOneWidget);
@@ -218,6 +218,11 @@ void main() {
       expect(find.text('Settings'), findsOneWidget);
       expect(find.text('Video & Audio'), findsOneWidget);
       expect(find.text('Battery Saver Preview'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('How to Use Phone2Screen'),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('How to Use Phone2Screen'), findsOneWidget);
     },
   );

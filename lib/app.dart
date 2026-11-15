@@ -8,6 +8,7 @@ import 'views/receiver/receiver_screen.dart';
 import 'views/sender/sender_screen.dart';
 import 'views/settings/settings_screen.dart';
 import 'views/shared/app_shell_header.dart';
+import 'views/shared/keyboard_shortcuts_scope.dart';
 
 /// Root adaptive Phone2Screen app switching cleanly between Receiver and Sender.
 class const Phone2ScreenApp({super.key}) extends ConsumerWidget {
@@ -28,21 +29,23 @@ class const Phone2ScreenApp({super.key}) extends ConsumerWidget {
       builder: (context, child) => MaterialUiCompatibilityBridge(
         child: child ?? const SizedBox.shrink(),
       ),
-      home: Builder(
-        builder: (navContext) => Scaffold(
-          appBar: hideHeader
-              ? null
-              : AppShellHeader(
-                  onOpenSettings: () => Navigator.of(navContext).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const SettingsScreen(),
+      home: KeyboardShortcutsScope(
+        child: Builder(
+          builder: (navContext) => Scaffold(
+            appBar: hideHeader
+                ? null
+                : AppShellHeader(
+                    onOpenSettings: () => Navigator.of(navContext).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const SettingsScreen(),
+                      ),
                     ),
                   ),
-                ),
-          body: switch (activeRole) {
-            .receiver => const ReceiverScreen(),
-            .sender => const SenderScreen(),
-          },
+            body: switch (activeRole) {
+              .receiver => const ReceiverScreen(),
+              .sender => const SenderScreen(),
+            },
+          ),
         ),
       ),
     );

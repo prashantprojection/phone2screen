@@ -6,6 +6,7 @@ import '../../../models/media_source_type.dart';
 import '../../../providers/platform_provider.dart';
 import '../../../providers/session_provider.dart';
 import '../../../providers/settings_provider.dart';
+import '../../../providers/shortcut_provider.dart';
 import '../../shared/clipboard_sync_sheet.dart';
 import 'desktop_source_dialog.dart';
 
@@ -34,6 +35,7 @@ class const ActiveSenderControls({super.key}) extends ConsumerWidget {
     final session = ref.watch(sessionProvider);
     final config = ref.watch(streamConfigProvider);
     final platform = ref.watch(platformServiceProvider);
+    final shortcuts = ref.watch(shortcutProvider);
     final notifier = ref.read(sessionProvider.notifier);
     final isCamera = config.sourceType == .camera;
 
@@ -60,13 +62,19 @@ class const ActiveSenderControls({super.key}) extends ConsumerWidget {
               ),
               label: Text(isCamera ? 'Screen' : 'Camera'),
             ),
-            OutlinedButton.icon(
-              onPressed: notifier.toggleMicMute,
-              icon: Icon(
-                session.isMicMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
-                size: 18,
+            Tooltip(
+              message: shortcuts.tooltipFor(
+                session.isMicMuted ? 'Unmute' : 'Mute',
+                .toggleMute,
               ),
-              label: Text(session.isMicMuted ? 'Unmute' : 'Mute'),
+              child: OutlinedButton.icon(
+                onPressed: notifier.toggleMicMute,
+                icon: Icon(
+                  session.isMicMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
+                  size: 18,
+                ),
+                label: Text(session.isMicMuted ? 'Unmute' : 'Mute'),
+              ),
             ),
             if (isCamera && platform.isMobile)
               OutlinedButton.icon(
@@ -77,19 +85,25 @@ class const ActiveSenderControls({super.key}) extends ConsumerWidget {
                 ),
                 label: const Text('Torch'),
               ),
-            OutlinedButton.icon(
-              onPressed: () => ClipboardSyncSheet.show(context),
-              icon: const Icon(Icons.content_paste_go_rounded, size: 18),
-              label: const Text('Share Text'),
-            ),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.accentRed,
-                foregroundColor: Colors.white,
+            Tooltip(
+              message: shortcuts.tooltipFor('Share Text', .openClipboard),
+              child: OutlinedButton.icon(
+                onPressed: () => ClipboardSyncSheet.show(context),
+                icon: const Icon(Icons.content_paste_go_rounded, size: 18),
+                label: const Text('Share Text'),
               ),
-              onPressed: notifier.disconnect,
-              icon: const Icon(Icons.stop_circle_outlined, size: 18),
-              label: const Text('Stop'),
+            ),
+            Tooltip(
+              message: shortcuts.tooltipFor('Stop', .disconnectStream),
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.accentRed,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: notifier.disconnect,
+                icon: const Icon(Icons.stop_circle_outlined, size: 18),
+                label: const Text('Stop'),
+              ),
             ),
           ],
         ),

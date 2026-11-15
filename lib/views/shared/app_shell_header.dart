@@ -6,6 +6,8 @@ import '../../models/device_role.dart';
 import '../../models/session_phase.dart';
 import '../../providers/platform_provider.dart';
 import '../../providers/session_provider.dart';
+import '../../providers/settings_provider.dart';
+import '../../providers/shortcut_provider.dart';
 import 'how_to_use_sheet.dart';
 
 /// Top bar with brand mark, live status pill, role switcher, guide, and settings.
@@ -18,7 +20,13 @@ class const AppShellHeader({super.key, required final VoidCallback onOpenSetting
   Widget build(BuildContext context, WidgetRef ref) {
     final activeRole = ref.watch(activeRoleProvider);
     final session = ref.watch(sessionProvider);
+    final shortcuts = ref.watch(shortcutProvider);
     final colors = Theme.of(context).colorScheme;
+    final canFullscreen =
+        activeRole == .receiver &&
+        (session.phase == .streaming ||
+            session.phase == .connecting ||
+            session.phase == .reconnecting);
 
     return Material(
       color: colors.surface,
@@ -59,10 +67,18 @@ class const AppShellHeader({super.key, required final VoidCallback onOpenSetting
                     selected: {activeRole},
                     onSelectionChanged: (s) => _onRoleSelected(context, ref, activeRole, s.first, session.phase),
                   ),
+                  if (canFullscreen)
+                    IconButton(
+                      onPressed: () =>
+                          ref.read(viewerDisplayProvider.notifier).toggleFullscreen(),
+                      icon: const Icon(Icons.fullscreen_rounded),
+                      tooltip: shortcuts.tooltipFor('Fullscreen', .toggleFullscreen),
+                      visualDensity: .compact,
+                    ),
                   IconButton(
                     onPressed: () => HowToUseSheet.show(context),
                     icon: const Icon(Icons.help_outline_rounded),
-                    tooltip: 'How to Use',
+                    tooltip: shortcuts.tooltipFor('How to Use', .openGuide),
                     visualDensity: .compact,
                   ),
                   IconButton(
