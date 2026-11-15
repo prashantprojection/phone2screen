@@ -76,11 +76,18 @@ class _ManualConnectSheetState extends ConsumerState<ManualConnectSheet> {
             crossAxisAlignment: .stretch,
             spacing: 14,
             children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(color: colors.outlineVariant, borderRadius: .circular(999)),
+                ),
+              ),
               Row(
                 mainAxisAlignment: .spaceBetween,
                 children: [
                   Text('Enter IP Manually', style: theme.textTheme.titleLarge?.copyWith(fontWeight: .w700)),
-                  IconButton(onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.close_rounded)),
+                  IconButton(tooltip: 'Close', onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.close_rounded)),
                 ],
               ),
               Text(
@@ -90,9 +97,9 @@ class _ManualConnectSheetState extends ConsumerState<ManualConnectSheet> {
               Container(
                 padding: const .symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
-                  color: AppColors.accentGreen.withValues(alpha: 0.1),
-                  borderRadius: .circular(10),
-                  border: Border.all(color: AppColors.accentGreen.withValues(alpha: 0.35)),
+                  color: AppColors.accentGreen.withValues(alpha: 0.10),
+                  borderRadius: .circular(12),
+                  border: Border.all(color: AppColors.accentGreen.withValues(alpha: 0.25)),
                 ),
                 child: Row(
                   spacing: 9,
@@ -147,6 +154,7 @@ class _ManualConnectSheetState extends ConsumerState<ManualConnectSheet> {
                 ],
               ),
               FilledButton.icon(
+                style: FilledButton.styleFrom(shape: const StadiumBorder(), minimumSize: const Size.fromHeight(48)),
                 onPressed: _submit,
                 icon: const Icon(Icons.cast_connected_rounded),
                 label: const Text('Connect & Start Casting'),

@@ -14,14 +14,15 @@ import 'how_to_use_sheet.dart';
 class const AppShellHeader({super.key, required final VoidCallback onOpenSettings})
     extends ConsumerWidget implements PreferredSizeWidget {
   @override
-  Size get preferredSize => const Size.fromHeight(64);
+  Size get preferredSize => const Size.fromHeight(56);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final activeRole = ref.watch(activeRoleProvider);
     final session = ref.watch(sessionProvider);
     final shortcuts = ref.watch(shortcutProvider);
-    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final canFullscreen =
         activeRole == .receiver &&
         (session.phase == .streaming ||
@@ -29,87 +30,133 @@ class const AppShellHeader({super.key, required final VoidCallback onOpenSetting
             session.phase == .reconnecting);
 
     return Material(
-      color: colors.surface,
+      color: theme.scaffoldBackgroundColor,
       child: SafeArea(
         bottom: false,
-        child: Container(
-          height: 64,
-          padding: const .symmetric(horizontal: 10),
-          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: colors.outlineVariant))),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final wide = constraints.maxWidth >= 680;
-              final compact = constraints.maxWidth < 460;
-              final showTitle = constraints.maxWidth >= 500;
-              final iconStyle = compact
-                  ? IconButton.styleFrom(
-                      padding: const .all(6),
-                      minimumSize: const Size(34, 34),
-                      tapTargetSize: .shrinkWrap,
-                    )
-                  : null;
-              return Row(
-                spacing: wide ? 8 : (compact ? 4 : 6),
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: .circular(10)),
-                    child: const Icon(Icons.cast_connected_rounded, color: Colors.white, size: 18),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final centered = constraints.maxWidth >= 720;
+            final wide = constraints.maxWidth >= 680;
+            final compact = constraints.maxWidth < 460;
+            final showTitle = constraints.maxWidth >= 500;
+            final iconStyle = compact
+                ? IconButton.styleFrom(
+                    padding: const .all(6),
+                    minimumSize: const Size(34, 34),
+                    tapTargetSize: .shrinkWrap,
+                  )
+                : null;
+
+            final brand = Row(
+              mainAxisSize: .min,
+              spacing: wide ? 10 : (compact ? 6 : 8),
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    gradient: AppColors.primaryGradient,
+                    borderRadius: .circular(9),
                   ),
-                  if (showTitle)
-                    Text('Phone2Screen', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: .w700)),
-                  _PhasePill(phase: session.phase, showLabel: wide),
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: FittedBox(
-                        fit: .scaleDown,
-                        alignment: Alignment.centerRight,
-                        child: SegmentedButton<DeviceRole>(
-                          showSelectedIcon: false,
-                          style: ButtonStyle(
-                            visualDensity: .compact,
-                            tapTargetSize: .shrinkWrap,
-                            padding: WidgetStatePropertyAll(.symmetric(horizontal: wide ? 10 : 8)),
+                  child: const Icon(Icons.cast_connected_rounded, color: Colors.white, size: 17),
+                ),
+                if (showTitle)
+                  Text(
+                    'Phone2Screen',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: .w700,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                _PhasePill(phase: session.phase, showLabel: wide),
+              ],
+            );
+
+            final switcher = _RolePillSwitcher(
+              activeRole: activeRole,
+              showIcons: wide,
+              onSelected: (next) => _onRoleSelected(context, ref, activeRole, next, session.phase),
+            );
+
+            final actions = Row(
+              mainAxisSize: .min,
+              spacing: compact ? 2 : 4,
+              children: [
+                if (canFullscreen)
+                  IconButton(
+                    onPressed: () => ref.read(viewerDisplayProvider.notifier).toggleFullscreen(),
+                    icon: const Icon(Icons.fullscreen_rounded),
+                    tooltip: shortcuts.tooltipFor('Fullscreen', .toggleFullscreen),
+                    style: iconStyle,
+                    visualDensity: .compact,
+                  ),
+                IconButton(
+                  onPressed: () => HowToUseSheet.show(context),
+                  icon: const Icon(Icons.help_outline_rounded),
+                  tooltip: shortcuts.tooltipFor('How to Use', .openGuide),
+                  style: iconStyle,
+                  visualDensity: .compact,
+                ),
+                IconButton(
+                  onPressed: onOpenSettings,
+                  icon: const Icon(Icons.settings_outlined),
+                  tooltip: 'Settings',
+                  style: iconStyle,
+                  visualDensity: .compact,
+                ),
+              ],
+            );
+
+            return Container(
+              height: 56,
+              padding: .symmetric(horizontal: wide ? 16 : 10),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.45)),
+                ),
+              ),
+              child: centered
+                  ? Row(
+                      spacing: 8,
+                      children: [
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: FittedBox(
+                              fit: .scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: brand,
+                            ),
                           ),
-                          segments: const [
-                            ButtonSegment(value: .receiver, label: Text('Receive')),
-                            ButtonSegment(value: .sender, label: Text('Send')),
-                          ],
-                          selected: {activeRole},
-                          onSelectionChanged: (s) => _onRoleSelected(context, ref, activeRole, s.first, session.phase),
                         ),
-                      ),
+                        switcher,
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: actions,
+                          ),
+                        ),
+                      ],
+                    )
+                  : Row(
+                      spacing: compact ? 4 : 6,
+                      children: [
+                        brand,
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: FittedBox(
+                              fit: .scaleDown,
+                              alignment: Alignment.centerRight,
+                              child: switcher,
+                            ),
+                          ),
+                        ),
+                        actions,
+                      ],
                     ),
-                  ),
-                  if (canFullscreen)
-                    IconButton(
-                      onPressed: () =>
-                          ref.read(viewerDisplayProvider.notifier).toggleFullscreen(),
-                      icon: const Icon(Icons.fullscreen_rounded),
-                      tooltip: shortcuts.tooltipFor('Fullscreen', .toggleFullscreen),
-                      style: iconStyle,
-                      visualDensity: .compact,
-                    ),
-                  IconButton(
-                    onPressed: () => HowToUseSheet.show(context),
-                    icon: const Icon(Icons.help_outline_rounded),
-                    tooltip: shortcuts.tooltipFor('How to Use', .openGuide),
-                    style: iconStyle,
-                    visualDensity: .compact,
-                  ),
-                  IconButton(
-                    onPressed: onOpenSettings,
-                    icon: const Icon(Icons.settings_outlined),
-                    tooltip: 'Settings',
-                    style: iconStyle,
-                    visualDensity: .compact,
-                  ),
-                ],
-              );
-            },
-          ),
+            );
+          },
         ),
       ),
     );
@@ -145,28 +192,98 @@ class const AppShellHeader({super.key, required final VoidCallback onOpenSetting
   }
 }
 
+class const _RolePillSwitcher({
+  required final DeviceRole activeRole,
+  required final bool showIcons,
+  required final ValueChanged<DeviceRole> onSelected,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    Widget segment(DeviceRole role, String label, IconData icon) {
+      final selected = activeRole == role;
+      final fg = selected ? Colors.white : colors.onSurfaceVariant;
+      return Semantics(
+        button: true,
+        selected: selected,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          decoration: BoxDecoration(
+            color: selected ? colors.primary : Colors.transparent,
+            borderRadius: .circular(999),
+          ),
+          child: Material(
+            type: .transparency,
+            child: InkWell(
+              borderRadius: .circular(999),
+              onTap: () => onSelected(role),
+              child: Padding(
+                padding: .symmetric(horizontal: showIcons ? 14 : 12, vertical: 6),
+                child: Row(
+                  mainAxisSize: .min,
+                  spacing: 6,
+                  children: [
+                    if (showIcons) Icon(icon, size: 15, color: fg),
+                    Text(
+                      label,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: fg,
+                        fontWeight: selected ? .w700 : .w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const .all(3),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainer,
+        borderRadius: .circular(999),
+      ),
+      child: Row(
+        mainAxisSize: .min,
+        spacing: 2,
+        children: [
+          segment(.receiver, 'Receive', Icons.tv_rounded),
+          segment(.sender, 'Send', Icons.videocam_rounded),
+        ],
+      ),
+    );
+  }
+}
+
 class const _PhasePill({
   required final SessionPhase phase,
   required final bool showLabel,
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
     final (label, color) = switch (phase) {
       .streaming => ('Live', AppColors.accentGreen),
       .hosting || .discovering => ('Ready', AppColors.primaryBlue),
       .connecting => ('Connecting', AppColors.accentOrange),
       .reconnecting => ('Reconnecting', AppColors.accentOrange),
       .failed => ('Issue', AppColors.accentRed),
-      .idle => ('Ready', AppColors.textSecondaryDark),
+      .idle => ('Ready', muted),
     };
     return Tooltip(
       message: label,
       child: Container(
         padding: .symmetric(horizontal: showLabel ? 10 : 8, vertical: 5),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.14),
+          color: color.withValues(alpha: 0.12),
           borderRadius: .circular(999),
-          border: Border.all(color: color.withValues(alpha: 0.4)),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
         ),
         child: Row(
           mainAxisSize: .min,

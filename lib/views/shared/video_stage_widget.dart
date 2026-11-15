@@ -94,7 +94,7 @@ class _VideoStageWidgetState extends State<VideoStageWidget> {
       borderRadius: .circular(widget.borderRadius),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: config.cleanFeedMode ? Colors.black : AppColors.backgroundDark,
+          color: config.cleanFeedMode ? Colors.black : const Color(0xFF07080A),
         ),
         child: stream == null || !_initialized
             ? _WaitingPlaceholder(label: widget.waitingLabel)
@@ -172,28 +172,53 @@ class const _WaitingPlaceholder({required final String label})
     extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const .all(24),
-        child: Column(
-          mainAxisSize: .min,
-          spacing: 12,
-          children: [
-            const Icon(
-              Icons.cast_connected_rounded,
-              size: 40,
-              color: AppColors.primaryLight,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tight = constraints.maxHeight < 165 || constraints.maxWidth < 180;
+        final boxSize = tight ? 48.0 : 70.0;
+        return Center(
+          child: SingleChildScrollView(
+            padding: .all(tight ? 12 : 24),
+            child: Column(
+              mainAxisSize: .min,
+              spacing: tight ? 8 : 14,
+              children: [
+                Container(
+                  width: boxSize,
+                  height: boxSize,
+                  decoration: BoxDecoration(
+                    shape: .circle,
+                    color: AppColors.primaryBlue.withValues(alpha: 0.12),
+                    border: Border.all(
+                      color: AppColors.primaryLight.withValues(alpha: 0.28),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primaryBlue.withValues(alpha: 0.14),
+                        blurRadius: 24,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.cast_connected_rounded,
+                    size: tight ? 22 : 30,
+                    color: AppColors.primaryLight,
+                  ),
+                ),
+                Text(
+                  label,
+                  textAlign: .center,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondaryDark,
+                    fontWeight: .w500,
+                  ),
+                ),
+              ],
             ),
-            Text(
-              label,
-              textAlign: .center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondaryDark,
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

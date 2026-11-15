@@ -52,6 +52,7 @@ class _RigPresetsStripState extends ConsumerState<RigPresetsStrip> {
   Widget build(BuildContext context) {
     final presets = ref.watch(allRigPresetsProvider);
     final config = ref.watch(streamConfigProvider);
+    final colors = Theme.of(context).colorScheme;
     final activeId = _resolveActiveId(presets, config);
 
     return SingleChildScrollView(
@@ -65,7 +66,19 @@ class _RigPresetsStripState extends ConsumerState<RigPresetsStrip> {
               child: ChoiceChip(
                 showCheckmark: false,
                 visualDensity: .compact,
-                avatar: Icon(_iconForPreset(preset), size: 16),
+                shape: const StadiumBorder(),
+                backgroundColor: colors.surfaceContainer,
+                selectedColor: colors.primary.withValues(alpha: 0.14),
+                side: BorderSide(
+                  color: preset.id == activeId
+                      ? colors.primary.withValues(alpha: 0.65)
+                      : colors.outlineVariant.withValues(alpha: 0.45),
+                ),
+                avatar: Icon(
+                  _iconForPreset(preset),
+                  size: 16,
+                  color: preset.id == activeId ? colors.primary : colors.onSurfaceVariant,
+                ),
                 label: Text(preset.name),
                 selected: preset.id == activeId,
                 onSelected: (_) {

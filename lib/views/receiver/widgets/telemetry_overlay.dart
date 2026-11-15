@@ -22,7 +22,7 @@ class const TelemetryOverlay({
         child: Container(
           padding: const .symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: AppColors.backgroundDark.withValues(alpha: 0.72),
+            color: const Color(0xFF121418).withValues(alpha: 0.78),
             borderRadius: .circular(999),
             border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
           ),

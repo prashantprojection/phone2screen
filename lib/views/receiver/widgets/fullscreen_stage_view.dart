@@ -146,7 +146,7 @@ class _FullscreenStageViewState extends ConsumerState<FullscreenStageView> {
   Widget _peerPill(String name) => _frostedPill(
     radius: 999,
     padding: const .symmetric(horizontal: 12, vertical: 6),
-    alpha: 0.72,
+    alpha: 0.78,
     child: Row(
       mainAxisSize: .min,
       spacing: 7,
@@ -161,8 +161,8 @@ class _FullscreenStageViewState extends ConsumerState<FullscreenStageView> {
   Widget _escHintToast() => _frostedPill(
     radius: 16,
     padding: const .symmetric(horizontal: 16, vertical: 10),
-    alpha: 0.86,
-    shadows: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 6))],
+    alpha: 0.78,
+    shadows: [BoxShadow(color: Colors.black.withValues(alpha: 0.38), blurRadius: 20, offset: const Offset(0, 6))],
     child: const Row(
       mainAxisSize: .min,
       spacing: 10,
@@ -179,17 +179,28 @@ class _FullscreenStageViewState extends ConsumerState<FullscreenStageView> {
   );
 }
 
-Widget _frostedPill({required double radius, required EdgeInsetsGeometry padding, required double alpha, List<BoxShadow>? shadows, required Widget child}) => ClipRRect(
-  borderRadius: .circular(radius),
-  child: BackdropFilter(
-    filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-    child: Container(
-      padding: padding,
-      decoration: BoxDecoration(color: AppColors.backgroundDark.withValues(alpha: alpha), borderRadius: .circular(radius), border: Border.all(color: Colors.white.withValues(alpha: 0.16)), boxShadow: shadows),
-      child: child,
+Widget _frostedPill({required double radius, required EdgeInsetsGeometry padding, double alpha = 0.78, List<BoxShadow>? shadows, required Widget child}) {
+  final glass = ClipRRect(
+    borderRadius: .circular(radius),
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+      child: Container(
+        padding: padding,
+        decoration: BoxDecoration(
+          color: const Color(0xFF121418).withValues(alpha: alpha),
+          borderRadius: .circular(radius),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        ),
+        child: child,
+      ),
     ),
-  ),
-);
+  );
+  if (shadows == null) return glass;
+  return DecoratedBox(
+    decoration: BoxDecoration(borderRadius: .circular(radius), boxShadow: shadows),
+    child: glass,
+  );
+}
 
 class const _FullscreenHudPill({required final ViewerDisplayConfig display, required final VoidCallback onExitFullscreen}) extends ConsumerWidget {
   @override
@@ -199,10 +210,10 @@ class const _FullscreenHudPill({required final ViewerDisplayConfig display, requ
     return Material(
       type: .transparency,
       child: _frostedPill(
-        radius: 20,
-        padding: const .symmetric(horizontal: 10, vertical: 8),
-        alpha: 0.80,
-        shadows: [BoxShadow(color: Colors.black.withValues(alpha: 0.32), blurRadius: 20, offset: const Offset(0, 6))],
+        radius: 999,
+        padding: const .symmetric(horizontal: 10, vertical: 6),
+        alpha: 0.78,
+        shadows: [BoxShadow(color: Colors.black.withValues(alpha: 0.38), blurRadius: 24, offset: const Offset(0, 8))],
         child: SingleChildScrollView(
           scrollDirection: .horizontal,
           child: Row(
@@ -217,8 +228,8 @@ class const _FullscreenHudPill({required final ViewerDisplayConfig display, requ
               _hudBtn(display.audioMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded, shortcuts.tooltipFor(display.audioMuted ? 'Unmute' : 'Mute', .toggleMute), notifier.toggleMute, accent: display.audioMuted ? AppColors.accentOrange : null),
               _hudBtn(Icons.content_paste_go_rounded, shortcuts.tooltipFor('Share Text', .openClipboard), () => ClipboardSyncSheet.show(context)),
               _hudBtn(Icons.speed_rounded, shortcuts.tooltipFor('Live Stats', .toggleStats), notifier.toggleTelemetry, active: display.showTelemetry),
-              Container(width: 1, height: 22, margin: const .symmetric(horizontal: 2), color: Colors.white.withValues(alpha: 0.18)),
-              _hudPillBtn('Hide Controls', Icons.visibility_off_outlined, shortcuts.tooltipFor('Hide Controls', .toggleFullscreenHud), notifier.toggleFullscreenHud, border: Colors.white.withValues(alpha: 0.24)),
+              Container(width: 1, height: 22, margin: const .symmetric(horizontal: 2), color: Colors.white.withValues(alpha: 0.16)),
+              _hudPillBtn('Hide Controls', Icons.visibility_off_outlined, shortcuts.tooltipFor('Hide Controls', .toggleFullscreenHud), notifier.toggleFullscreenHud, border: Colors.white.withValues(alpha: 0.22)),
               _hudPillBtn('Exit Fullscreen', Icons.fullscreen_exit_rounded, 'Exit Fullscreen (Esc)', onExitFullscreen, bg: Colors.white.withValues(alpha: 0.16)),
             ],
           ),
@@ -232,8 +243,8 @@ class const _FullscreenHudPill({required final ViewerDisplayConfig display, requ
     return Tooltip(
       message: tip,
       child: Material(
-        color: tone != null ? tone.withValues(alpha: 0.22) : Colors.white.withValues(alpha: 0.08),
-        shape: RoundedRectangleBorder(borderRadius: .circular(11), side: BorderSide(color: tone != null ? tone.withValues(alpha: 0.52) : Colors.white.withValues(alpha: 0.14))),
+        color: tone != null ? tone.withValues(alpha: 0.20) : Colors.white.withValues(alpha: 0.08),
+        shape: RoundedRectangleBorder(borderRadius: .circular(999), side: BorderSide(color: tone != null ? tone.withValues(alpha: 0.50) : Colors.white.withValues(alpha: 0.12))),
         clipBehavior: .antiAlias,
         child: InkWell(onTap: onTap, child: SizedBox(width: 38, height: 38, child: Icon(icon, size: 19, color: tone ?? AppColors.textPrimaryDark))),
       ),
@@ -244,7 +255,7 @@ class const _FullscreenHudPill({required final ViewerDisplayConfig display, requ
     message: tip,
     child: FilledButton.tonalIcon(
       onPressed: onTap,
-      style: FilledButton.styleFrom(backgroundColor: bg ?? Colors.transparent, foregroundColor: AppColors.textPrimaryDark, side: border != null ? BorderSide(color: border) : null, minimumSize: const Size(0, 38), padding: const .symmetric(horizontal: 12), shape: RoundedRectangleBorder(borderRadius: .circular(12))),
+      style: FilledButton.styleFrom(backgroundColor: bg ?? Colors.transparent, foregroundColor: AppColors.textPrimaryDark, side: border != null ? BorderSide(color: border) : null, minimumSize: const Size(0, 38), padding: const .symmetric(horizontal: 14), shape: const StadiumBorder()),
       icon: Icon(icon, size: 17),
       label: Text(label),
     ),

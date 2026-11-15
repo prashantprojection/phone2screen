@@ -64,8 +64,13 @@ class const QrPairingCard({super.key, required final SignalingData endpoint})
                 borderRadius: .circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primaryBlue.withValues(alpha: 0.12),
-                    blurRadius: 18,
+                    color: AppColors.primaryBlue.withValues(alpha: 0.20),
+                    blurRadius: 28,
+                    spreadRadius: 2,
+                  ),
+                  BoxShadow(
+                    color: AppColors.cyanAccent.withValues(alpha: 0.12),
+                    blurRadius: 14,
                   ),
                 ],
               ),
@@ -77,11 +82,10 @@ class const QrPairingCard({super.key, required final SignalingData endpoint})
             ),
             Container(
               width: double.infinity,
-              padding: const .all(12),
+              padding: const .symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: colors.surfaceContainer,
+                color: colors.surfaceContainer.withValues(alpha: 0.65),
                 borderRadius: .circular(12),
-                border: Border.all(color: colors.outlineVariant),
               ),
               child: const Column(
                 crossAxisAlignment: .start,

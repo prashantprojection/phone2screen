@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -64,60 +66,114 @@ class const ReceiverStreamingStage({
       );
     }
 
-    return Column(
-      children: [
-        if (session.errorMessage != null)
-          Padding(
-            padding: const .fromLTRB(16, 12, 16, 0),
-            child: ErrorBanner(message: session.errorMessage!, onDismiss: onDismissError),
-          ),
-        Expanded(
-          child: Padding(
-            padding: const .fromLTRB(16, 12, 16, 8),
-            child: multiCam.secondarySlots.isNotEmpty
+    final isMultiCam = multiCam.secondarySlots.isNotEmpty;
+
+    return ColoredBox(
+      color: Colors.black,
+      child: Stack(
+        fit: .expand,
+        children: [
+          Positioned.fill(
+            child: isMultiCam
                 ? MultiCamGridView(session: session, display: display)
-                : Stack(
-                    children: [
-                      Positioned.fill(
-                        child: GestureDetector(
-                          behavior: .opaque,
-                          onDoubleTap: () =>
-                              ref.read(viewerDisplayProvider.notifier).toggleFullscreen(),
-                          child: VideoStageWidget(
-                            stream: session.remoteStream,
-                            displayConfig: display,
-                            waitingLabel: waitingLabel,
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        top: 12,
-                        left: 12,
-                        right: 12,
-                        child: IgnorePointer(
-                          child: Wrap(
-                            alignment: .spaceBetween,
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              display.showTelemetry
-                                  ? TelemetryOverlay(telemetry: session.telemetry)
-                                  : const SizedBox.shrink(),
-                              if (session.connectedPeerName != null)
-                                _PeerBadge(name: session.connectedPeerName!),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
+                : GestureDetector(
+                    behavior: .opaque,
+                    onDoubleTap: () =>
+                        ref.read(viewerDisplayProvider.notifier).toggleFullscreen(),
+                    child: VideoStageWidget(
+                      stream: session.remoteStream,
+                      displayConfig: display,
+                      borderRadius: 0,
+                      waitingLabel: waitingLabel,
+                    ),
                   ),
           ),
-        ),
-        const Padding(
-          padding: .fromLTRB(16, 4, 16, 16),
-          child: ReceiverControlsBar(),
-        ),
-      ],
+          if (!isMultiCam)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 84,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.55),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (!isMultiCam || session.errorMessage != null)
+            Positioned(
+              top: 14,
+              left: 16,
+              right: 16,
+              child: Column(
+                mainAxisSize: .min,
+                crossAxisAlignment: .stretch,
+                spacing: 10,
+                children: [
+                  if (session.errorMessage != null)
+                    Material(
+                      color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.94),
+                      borderRadius: .circular(12),
+                      child: ErrorBanner(
+                        message: session.errorMessage!,
+                        onDismiss: onDismissError,
+                      ),
+                    ),
+                  if (!isMultiCam)
+                    IgnorePointer(
+                      child: Wrap(
+                        alignment: .spaceBetween,
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          display.showTelemetry
+                              ? TelemetryOverlay(telemetry: session.telemetry)
+                              : const SizedBox.shrink(),
+                          if (session.connectedPeerName != null)
+                            _PeerBadge(name: session.connectedPeerName!),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 96,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.62),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const Positioned(
+            left: 16,
+            right: 16,
+            bottom: 14,
+            child: SafeArea(top: false, child: ReceiverControlsBar()),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -125,36 +181,42 @@ class const ReceiverStreamingStage({
 class const _PeerBadge({required final String name}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const .symmetric(horizontal: 12, vertical: 7),
-      decoration: BoxDecoration(
-        color: AppColors.backgroundDark.withValues(alpha: 0.72),
-        borderRadius: .circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-      ),
-      child: Row(
-        mainAxisSize: .min,
-        spacing: 7,
-        children: [
-          Container(
-            width: 7,
-            height: 7,
-            decoration: const BoxDecoration(color: AppColors.accentGreen, shape: .circle),
+    return ClipRRect(
+      borderRadius: .circular(999),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          padding: const .symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFF121418).withValues(alpha: 0.78),
+            borderRadius: .circular(999),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
           ),
-          const Icon(Icons.smartphone_rounded, size: 14, color: AppColors.primaryLight),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 180),
-            child: Text(
-              name,
-              overflow: .ellipsis,
-              style: const TextStyle(
-                color: AppColors.textPrimaryDark,
-                fontSize: 12,
-                fontWeight: .w600,
+          child: Row(
+            mainAxisSize: .min,
+            spacing: 7,
+            children: [
+              Container(
+                width: 7,
+                height: 7,
+                decoration: const BoxDecoration(color: AppColors.accentGreen, shape: .circle),
               ),
-            ),
+              const Icon(Icons.smartphone_rounded, size: 14, color: AppColors.primaryLight),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 180),
+                child: Text(
+                  name,
+                  overflow: .ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textPrimaryDark,
+                    fontSize: 12,
+                    fontWeight: .w600,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

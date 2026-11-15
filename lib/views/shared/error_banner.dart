@@ -15,11 +15,11 @@ class const ErrorBanner({
     const accent = AppColors.accentRed;
 
     return Container(
-      padding: const .symmetric(horizontal: 14, vertical: 10),
+      padding: const .symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.12),
-        borderRadius: .circular(12),
-        border: Border.all(color: accent.withValues(alpha: 0.45)),
+        color: accent.withValues(alpha: 0.11),
+        borderRadius: .circular(16),
+        border: Border.all(color: accent.withValues(alpha: 0.3)),
       ),
       child: Row(
         spacing: 10,

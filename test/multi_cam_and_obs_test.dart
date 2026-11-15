@@ -269,6 +269,7 @@ void main() {
     ));
     await tester.pump();
     expect(find.byType(ReceiverControlsBar), findsOneWidget);
+    expect(tester.widget<VideoStageWidget>(find.byType(VideoStageWidget)).borderRadius, 0.0);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.keyB);
     await tester.pumpAndSettle();
@@ -284,6 +285,11 @@ void main() {
     await tester.tap(find.text('Camera Rig'));
     await tester.pumpAndSettle();
     expect(find.byType(RemoteCameraPanel), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(
+      tester.widget<Align>(find.ancestor(of: find.byType(RemoteCameraPanel), matching: find.byType(Align)).first).alignment,
+      Alignment.centerRight,
+    );
 
     await tester.tap(find.text('16:9'));
     await tester.tap(find.text('3x3 Grid'));

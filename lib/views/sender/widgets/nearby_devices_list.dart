@@ -82,10 +82,13 @@ class const NearbyDevicesList({
                   for (final peer in peers)
                     ListTile(
                       contentPadding: const .symmetric(horizontal: 12, vertical: 4),
-                      shape: RoundedRectangleBorder(borderRadius: .circular(12), side: BorderSide(color: colors.outlineVariant)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: .circular(14),
+                        side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.42)),
+                      ),
                       tileColor: colors.surfaceContainer,
                       leading: CircleAvatar(
-                        backgroundColor: AppColors.primaryBlue.withValues(alpha: 0.14),
+                        backgroundColor: AppColors.primaryBlue.withValues(alpha: 0.12),
                         child: const Icon(Icons.desktop_windows_rounded, color: AppColors.primaryLight, size: 20),
                       ),
                       title: Text(peer.endpoint.deviceName, maxLines: 1, overflow: .ellipsis, style: theme.textTheme.titleSmall?.copyWith(fontWeight: .w600)),
@@ -97,7 +100,7 @@ class const NearbyDevicesList({
                           if (peer.endpoint.requiresPin)
                             const Tooltip(message: 'PIN required', child: Icon(Icons.lock_outline_rounded, size: 18, color: AppColors.accentOrange)),
                           FilledButton(
-                            style: FilledButton.styleFrom(padding: const .symmetric(horizontal: 14, vertical: 10)),
+                            style: FilledButton.styleFrom(shape: const StadiumBorder(), padding: const .symmetric(horizontal: 16, vertical: 10)),
                             onPressed: () => _connectToEndpoint(context, ref, peer.endpoint),
                             child: const Text('Connect'),
                           ),
@@ -109,17 +112,30 @@ class const NearbyDevicesList({
               ),
             const Divider(height: 1),
             Wrap(
-              spacing: 10,
-              runSpacing: 10,
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 if (onScanQr != null)
-                  FilledButton.icon(onPressed: onScanQr, icon: const Icon(Icons.qr_code_scanner_rounded, size: 18), label: const Text('Scan QR Code')),
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(shape: const StadiumBorder()),
+                    onPressed: onScanQr,
+                    icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+                    label: const Text('Scan QR Code'),
+                  ),
                 OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    shape: const StadiumBorder(),
+                    side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.65)),
+                  ),
                   onPressed: () => ManualConnectSheet.show(context),
                   icon: const Icon(Icons.dns_outlined, size: 18),
                   label: const Text('Enter IP Manually'),
                 ),
                 OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    shape: const StadiumBorder(),
+                    side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.65)),
+                  ),
                   onPressed: () => _connectViaUsbAdb(ref),
                   icon: const Icon(Icons.usb_rounded, size: 18),
                   label: const Text('USB / ADB'),
@@ -145,8 +161,8 @@ class const _ReconnectTile({
     return Container(
       decoration: BoxDecoration(
         color: colors.primary.withValues(alpha: 0.08),
-        borderRadius: .circular(12),
-        border: Border.all(color: colors.primary.withValues(alpha: 0.35)),
+        borderRadius: .circular(14),
+        border: Border.all(color: colors.primary.withValues(alpha: 0.25)),
       ),
       child: ListTile(
         dense: true,
@@ -159,7 +175,7 @@ class const _ReconnectTile({
           spacing: 2,
           children: [
             FilledButton.tonal(
-              style: FilledButton.styleFrom(visualDensity: .compact, padding: const .symmetric(horizontal: 12, vertical: 8)),
+              style: FilledButton.styleFrom(shape: const StadiumBorder(), visualDensity: .compact, padding: const .symmetric(horizontal: 14, vertical: 8)),
               onPressed: onConnect,
               child: const Text('Connect'),
             ),
@@ -180,7 +196,7 @@ class const _StepBadge({required final String step}) extends StatelessWidget {
       width: 26,
       height: 26,
       alignment: Alignment.center,
-      decoration: BoxDecoration(color: colors.primary.withValues(alpha: 0.16), shape: .circle, border: Border.all(color: colors.primary.withValues(alpha: 0.45))),
+      decoration: BoxDecoration(color: colors.primary.withValues(alpha: 0.12), shape: .circle),
       child: Text(step, style: TextStyle(color: colors.primary, fontSize: 13, fontWeight: .w800)),
     );
   }
@@ -213,7 +229,7 @@ class _RadarEmptyStateState extends State<_RadarEmptyState> with SingleTickerPro
             child: Container(
               width: 52,
               height: 52,
-              decoration: BoxDecoration(shape: .circle, color: AppColors.primaryBlue.withValues(alpha: 0.15), border: Border.all(color: AppColors.cyanAccent.withValues(alpha: 0.45))),
+              decoration: BoxDecoration(shape: .circle, color: AppColors.primaryBlue.withValues(alpha: 0.12), border: Border.all(color: AppColors.cyanAccent.withValues(alpha: 0.30))),
               child: const Icon(Icons.wifi_tethering_rounded, color: AppColors.cyanAccent, size: 26),
             ),
           ),

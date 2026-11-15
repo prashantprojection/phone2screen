@@ -218,13 +218,12 @@ class const _CopyableRow({
 
     return InkWell(
       onTap: enabled ? () => onCopy(text) : null,
-      borderRadius: .circular(10),
+      borderRadius: .circular(12),
       child: Container(
-        padding: const .symmetric(horizontal: 12, vertical: 10),
+        padding: const .symmetric(horizontal: 14, vertical: 11),
         decoration: BoxDecoration(
-          color: colors.surfaceContainer,
-          borderRadius: .circular(10),
-          border: Border.all(color: colors.outlineVariant),
+          color: colors.surfaceContainer.withValues(alpha: 0.65),
+          borderRadius: .circular(12),
         ),
         child: Row(
           spacing: 10,

@@ -45,8 +45,8 @@ class const HowToUseSheet({super.key}) extends StatelessWidget {
               spacing: 10,
               children: [
                 Container(
-                  width: 34,
-                  height: 34,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
                     color: AppColors.primaryBlue.withValues(alpha: 0.14),
                     borderRadius: .circular(10),
@@ -133,11 +133,11 @@ class const _ScenarioCard({
     final colors = theme.colorScheme;
 
     return Container(
-      padding: const .all(14),
+      padding: const .all(16),
       decoration: BoxDecoration(
         color: colors.surfaceContainer,
-        borderRadius: .circular(14),
-        border: Border.all(color: colors.outlineVariant),
+        borderRadius: .circular(16),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.4)),
       ),
       child: Column(
         crossAxisAlignment: .start,
@@ -226,11 +226,11 @@ class const _QuickTipsCard() extends StatelessWidget {
     ];
 
     return Container(
-      padding: const .all(14),
+      padding: const .all(16),
       decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: .circular(14),
-        border: Border.all(color: colors.outlineVariant),
+        color: colors.surfaceContainer.withValues(alpha: 0.65),
+        borderRadius: .circular(16),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.4)),
       ),
       child: Column(
         crossAxisAlignment: .start,

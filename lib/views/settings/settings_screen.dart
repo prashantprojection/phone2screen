@@ -87,7 +87,7 @@ class const SettingsScreen({super.key}) extends ConsumerWidget {
                     title: const Text('Advanced & Security'),
                     subtitle: const Text('4-digit PIN, shared text, bitrate & port'),
                     children: [
-                      const Divider(height: 1, indent: 52),
+                      const Divider(height: 1, indent: 62),
                       _dividedColumn([
                         _tile(primary, Icons.pin_outlined, '4-Digit Pairing PIN',
                             subtitle: settings.pin.isEmpty ? 'Off (open Wi-Fi pairing)' : 'Enabled (4-digit PIN)',
@@ -125,18 +125,31 @@ class const SettingsScreen({super.key}) extends ConsumerWidget {
   }
 
   Widget _dividedColumn(List<Widget> items) =>
-      Column(children: [for (var i = 0; i < items.length; i++) ...[if (i > 0) const Divider(height: 1, indent: 52), items[i]]]);
+      Column(children: [for (var i = 0; i < items.length; i++) ...[if (i > 0) const Divider(height: 1, indent: 62), items[i]]]);
 
   Widget _iconBadge(Color primary, IconData icon) => Container(
     width: 34,
     height: 34,
-    decoration: BoxDecoration(color: primary.withValues(alpha: 0.13), borderRadius: .circular(10)),
+    decoration: BoxDecoration(color: primary.withValues(alpha: 0.11), borderRadius: .circular(10)),
     child: Icon(icon, size: 18, color: primary),
   );
 
   Widget _sectionHeader(ThemeData theme, IconData icon, String title) => Padding(
-    padding: const .only(left: 4, bottom: 8),
-    child: Row(spacing: 8, children: [Icon(icon, size: 18, color: theme.colorScheme.primary), Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: .w700))]),
+    padding: const .only(left: 6, bottom: 8),
+    child: Row(
+      spacing: 8,
+      children: [
+        Icon(icon, size: 17, color: theme.colorScheme.primary),
+        Text(
+          title,
+          style: theme.textTheme.labelLarge?.copyWith(
+            fontWeight: .w700,
+            letterSpacing: 0.25,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    ),
   );
 
   Widget _tile(Color primary, IconData icon, String title, {String? subtitle, Widget? trailing, VoidCallback? onTap}) =>
@@ -146,7 +159,7 @@ class const SettingsScreen({super.key}) extends ConsumerWidget {
       SwitchListTile(secondary: _iconBadge(primary, icon), title: Text(title), subtitle: Text(subtitle), value: value, onChanged: onChanged);
 
   Widget _bitrateSection(ThemeData theme, ColorScheme colors, String mbps, double value, ValueChanged<int> onChanged) => Padding(
-    padding: const .fromLTRB(16, 12, 16, 4),
+    padding: const .fromLTRB(16, 12, 16, 6),
     child: Column(
       crossAxisAlignment: .stretch,
       children: [
@@ -157,17 +170,26 @@ class const SettingsScreen({super.key}) extends ConsumerWidget {
             Expanded(child: Text('Target Bitrate', style: theme.textTheme.bodyLarge)),
             Container(
               padding: const .symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(color: colors.primary.withValues(alpha: 0.13), borderRadius: .circular(999)),
+              decoration: BoxDecoration(color: colors.primary.withValues(alpha: 0.11), borderRadius: .circular(999)),
               child: Text('$mbps Mbps', style: theme.textTheme.labelMedium?.copyWith(color: colors.primary, fontWeight: .w700)),
             ),
           ],
         ),
-        Slider(
-          value: value,
-          min: StreamConstants.minVideoBitrate.toDouble(),
-          max: StreamConstants.maxVideoBitrate.toDouble(),
-          divisions: 49,
-          onChanged: (v) => onChanged(v.round()),
+        Builder(
+          builder: (context) => SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 3,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+            ),
+            child: Slider(
+              value: value,
+              min: StreamConstants.minVideoBitrate.toDouble(),
+              max: StreamConstants.maxVideoBitrate.toDouble(),
+              divisions: 49,
+              onChanged: (v) => onChanged(v.round()),
+            ),
+          ),
         ),
       ],
     ),
@@ -181,7 +203,11 @@ class const SettingsScreen({super.key}) extends ConsumerWidget {
       title: const Text('Network Port'),
       subtitle: const Text('Local port (${StreamConstants.defaultSignalingPort}–${StreamConstants.maxSignalingPort})'),
       trailing: Container(
-        decoration: BoxDecoration(color: colors.surfaceContainer, borderRadius: .circular(10), border: Border.all(color: colors.outlineVariant)),
+        decoration: BoxDecoration(
+          color: colors.surfaceContainer,
+          borderRadius: .circular(999),
+          border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.48)),
+        ),
         child: Row(
           mainAxisSize: .min,
           children: [

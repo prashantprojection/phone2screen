@@ -12,6 +12,7 @@ class const ClipboardSyncSheet({super.key}) extends ConsumerStatefulWidget {
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
+    showDragHandle: true,
     builder: (_) => const ClipboardSyncSheet(),
   );
 
@@ -60,7 +61,7 @@ class _ClipboardSyncSheetState extends ConsumerState<ClipboardSyncSheet> {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Padding(
-      padding: .fromLTRB(16, 16, 16, 16 + bottomInset),
+      padding: .fromLTRB(16, 4, 16, 16 + bottomInset),
       child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.72),
         child: Column(
@@ -73,9 +74,17 @@ class _ClipboardSyncSheetState extends ConsumerState<ClipboardSyncSheet> {
               spacing: 4,
               children: [
                 Row(
-                  spacing: 8,
+                  spacing: 10,
                   children: [
-                    const Icon(Icons.content_paste_go_rounded, size: 20),
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryBlue.withValues(alpha: 0.14),
+                        borderRadius: .circular(10),
+                      ),
+                      child: const Icon(Icons.content_paste_go_rounded, size: 18, color: AppColors.primaryLight),
+                    ),
                     Expanded(
                       child: Text(
                         'Share Text (Clipboard)',
@@ -118,8 +127,13 @@ class _ClipboardSyncSheetState extends ConsumerState<ClipboardSyncSheet> {
               ],
             ),
             if (history.isEmpty)
-              Padding(
-                padding: const .symmetric(vertical: 20),
+              Container(
+                padding: const .symmetric(horizontal: 16, vertical: 20),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainer.withValues(alpha: 0.6),
+                  borderRadius: .circular(16),
+                  border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35)),
+                ),
                 child: Text(
                   phase == .streaming
                       ? 'No shared text yet. Type or paste above to send.'
@@ -151,13 +165,13 @@ class _ClipboardSyncSheetState extends ConsumerState<ClipboardSyncSheet> {
     final mm = item.timestamp.minute.toString().padLeft(2, '0');
     return InkWell(
       onTap: () => _copyItem(item.text),
-      borderRadius: .circular(12),
+      borderRadius: .circular(16),
       child: Container(
-        padding: const .all(12),
+        padding: const .all(14),
         decoration: BoxDecoration(
           color: colors.surfaceContainer,
-          borderRadius: .circular(12),
-          border: Border.all(color: colors.outlineVariant),
+          borderRadius: .circular(16),
+          border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.4)),
         ),
         child: Row(
           spacing: 10,

@@ -60,13 +60,13 @@ class _OledTallyViewState extends State<OledTallyView> {
 
     return Material(
       color: Colors.black,
-      borderRadius: .circular(16),
+      borderRadius: .zero,
       clipBehavior: .antiAlias,
       child: GestureDetector(
         behavior: .opaque,
         onDoubleTap: widget.onShowPreview,
         child: Padding(
-          padding: const .fromLTRB(20, 54, 20, 20),
+          padding: const .fromLTRB(20, 68, 20, 96),
           child: AnimatedAlign(
             alignment: _shiftOffsets[_offsetIndex],
             duration: const Duration(milliseconds: 900),
@@ -137,9 +137,10 @@ class _OledTallyViewState extends State<OledTallyView> {
                   OutlinedButton.icon(
                     onPressed: widget.onShowPreview,
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white.withValues(alpha: 0.72),
-                      side: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
-                      padding: const .symmetric(horizontal: 16, vertical: 10),
+                      foregroundColor: Colors.white.withValues(alpha: 0.78),
+                      side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                      shape: const StadiumBorder(),
+                      padding: const .symmetric(horizontal: 18, vertical: 10),
                     ),
                     icon: const Icon(Icons.visibility_outlined, size: 18),
                     label: const Text('Wake Preview'),

@@ -11,7 +11,8 @@ import '../../../providers/settings_provider.dart';
 
 /// Studio modal for remote phone camera control, aspect framing, and GPU color.
 class const RemoteCameraPanel({super.key}) extends ConsumerStatefulWidget {
-  /// Presents the panel as a bottom sheet on phones or centered dialog on wide screens.
+  /// Presents the panel as a bottom sheet on phones or a floating right-hand
+  /// studio inspector on medium/expanded screens so the live stage stays visible.
   static Future<void> show(BuildContext context) {
     if (context.isCompact) {
       return showModalBottomSheet<void>(
@@ -21,14 +22,48 @@ class const RemoteCameraPanel({super.key}) extends ConsumerStatefulWidget {
         builder: (_) => const RemoteCameraPanel(),
       );
     }
-    return showDialog<void>(
+    return showGeneralDialog<void>(
       context: context,
-      builder: (_) => Dialog(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 540, maxHeight: 740),
-          child: const RemoteCameraPanel(),
-        ),
-      ),
+      barrierDismissible: true,
+      barrierLabel: 'Dismiss',
+      barrierColor: Colors.black.withValues(alpha: 0.22),
+      transitionDuration: const Duration(milliseconds: 180),
+      pageBuilder: (dialogContext, _, _) {
+        final colors = Theme.of(dialogContext).colorScheme;
+        return SafeArea(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const .all(12),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 432),
+                child: Material(
+                  color: colors.surface,
+                  elevation: 16,
+                  shadowColor: Colors.black.withValues(alpha: 0.42),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: .circular(22),
+                    side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.8)),
+                  ),
+                  clipBehavior: .antiAlias,
+                  child: const RemoteCameraPanel(),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (_, animation, _, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return SlideTransition(
+          position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(curved),
+          child: FadeTransition(opacity: curved, child: child),
+        );
+      },
     );
   }
 
@@ -89,101 +124,113 @@ class _RemoteCameraPanelState extends ConsumerState<RemoteCameraPanel> {
             _buildTargetBar(session.connectedPeerName ?? 'Primary Camera', multiCam),
           const Divider(height: 1),
           Flexible(
-            child: SingleChildScrollView(
-              padding: const .fromLTRB(20, 12, 20, 20),
-              child: Column(
-                crossAxisAlignment: .stretch,
-                spacing: 12,
-                children: [
-                  _sectionTitle(theme, 'Remote Phone Camera Rig', canHw ? 'Controls phone lens, torch, zoom, and exposure live' : 'Hardware lens controls unavailable for screen/browser source'),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+            child: Theme(
+              data: theme.copyWith(
+                visualDensity: .compact,
+                materialTapTargetSize: .shrinkWrap,
+                chipTheme: theme.chipTheme.copyWith(padding: const .symmetric(horizontal: 6)),
+              ),
+              child: SliderTheme(
+                data: theme.sliderTheme.copyWith(
+                  trackHeight: 3,
+                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                ),
+                child: SingleChildScrollView(
+                  padding: const .fromLTRB(16, 10, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: .stretch,
+                    spacing: 10,
                     children: [
-                      _rigChip(colors, Icons.cameraswitch_rounded, 'Flip Lens', false, canHw, () => sendCmd(const RemoteCameraCommand(command: .flip))),
-                      _rigChip(colors, Icons.flashlight_on_rounded, 'Torch', camState.torchOn, canHw, () => sendCmd(RemoteCameraCommand(command: .torch, enabled: !camState.torchOn))),
-                      _rigChip(colors, camState.micMuted ? Icons.mic_off_rounded : Icons.mic_rounded, 'Mic Mute', camState.micMuted, true, () => sendCmd(RemoteCameraCommand(command: .micMute, enabled: !camState.micMuted)), accent: AppColors.accentOrange),
-                      _rigChip(colors, Icons.center_focus_strong_rounded, 'AF Lock', camState.focusLocked, canHw, () => sendCmd(RemoteCameraCommand(command: .focusLock, enabled: !camState.focusLocked))),
-                    ],
-                  ),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    crossAxisAlignment: .center,
-                    children: [
-                      Text('Zoom Presets', style: theme.textTheme.labelMedium),
-                      for (final p in const [1.0, 2.0, 3.0])
-                        ActionChip(
-                          label: Text('${p.toInt()}x'),
-                          backgroundColor: (zoomVal - p).abs() < 0.12 ? colors.primary.withValues(alpha: 0.18) : null,
-                          onPressed: canZoom && p <= camState.maxZoom
-                              ? () {
-                                  setState(() => _pendingZoom = p);
-                                  sendCmd(RemoteCameraCommand(command: .zoom, value: p));
-                                }
-                              : null,
-                        ),
-                    ],
-                  ),
-                  _slider(theme, 'Zoom', '${zoomVal.toStringAsFixed(1)}x', zoomVal, camState.minZoom, maxZoom,
-                    onChanged: canZoom
-                        ? (v) {
-                            setState(() => _pendingZoom = v);
-                            sendCmd(RemoteCameraCommand(command: .zoom, value: v));
-                          }
-                        : null,
-                    onEnd: (_) => setState(() => _pendingZoom = null),
-                  ),
-                  _slider(theme, 'Exposure (EV)', '${evVal >= 0 ? '+' : ''}${evVal.toStringAsFixed(1)} EV', evVal, -2.0, 2.0,
-                    divisions: 16,
-                    onChanged: canHw
-                        ? (v) {
-                            setState(() => _pendingExposure = v);
-                            sendCmd(RemoteCameraCommand(command: .exposure, value: v));
-                          }
-                        : null,
-                    onEnd: (_) => setState(() => _pendingExposure = null),
-                  ),
-                  const Divider(height: 4),
-                  Row(
-                    mainAxisAlignment: .spaceBetween,
-                    children: [
-                      Expanded(child: _sectionTitle(theme, 'Studio Framing & GPU Color', 'Aspect crop, Rule-of-Thirds grid, pan & look')),
-                      TextButton.icon(
-                        onPressed: () => isPrimary
-                            ? primaryNotifier.resetFramingAndColor()
-                            : updateSecondary((c) => c.copyWith(aspectPreset: .free, digitalZoom: 1.0, panX: 0.0, panY: 0.0, brightness: 0.0, contrast: 1.0, saturation: 1.0)),
-                        icon: const Icon(Icons.restart_alt_rounded, size: 18),
-                        label: const Text('Reset Studio Look'),
+                      _sectionBox(
+                        colors,
+                        children: [
+                          _sectionTitle(theme, 'Remote Phone Camera Rig', canHw ? 'Controls phone lens, torch, zoom, and exposure live' : 'Hardware lens controls unavailable for screen/browser source'),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              _rigChip(colors, Icons.cameraswitch_rounded, 'Flip Lens', false, canHw, () => sendCmd(const RemoteCameraCommand(command: .flip))),
+                              _rigChip(colors, Icons.flashlight_on_rounded, 'Torch', camState.torchOn, canHw, () => sendCmd(RemoteCameraCommand(command: .torch, enabled: !camState.torchOn))),
+                              _rigChip(colors, camState.micMuted ? Icons.mic_off_rounded : Icons.mic_rounded, 'Mic Mute', camState.micMuted, true, () => sendCmd(RemoteCameraCommand(command: .micMute, enabled: !camState.micMuted)), accent: AppColors.accentOrange),
+                              _rigChip(colors, Icons.center_focus_strong_rounded, 'AF Lock', camState.focusLocked, canHw, () => sendCmd(RemoteCameraCommand(command: .focusLock, enabled: !camState.focusLocked))),
+                            ],
+                          ),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            crossAxisAlignment: .center,
+                            children: [
+                              Text('Zoom Presets', style: theme.textTheme.labelMedium),
+                              for (final p in const [1.0, 2.0, 3.0])
+                                ActionChip(
+                                  label: Text('${p.toInt()}x'),
+                                  backgroundColor: (zoomVal - p).abs() < 0.12 ? colors.primary.withValues(alpha: 0.18) : null,
+                                  onPressed: canZoom && p <= camState.maxZoom
+                                      ? () { setState(() => _pendingZoom = p); sendCmd(RemoteCameraCommand(command: .zoom, value: p)); }
+                                      : null,
+                                ),
+                            ],
+                          ),
+                          _slider(
+                            theme, 'Zoom', '${zoomVal.toStringAsFixed(1)}x', zoomVal, camState.minZoom, maxZoom,
+                            onChanged: canZoom ? (v) { setState(() => _pendingZoom = v); sendCmd(RemoteCameraCommand(command: .zoom, value: v)); } : null,
+                            onEnd: (_) => setState(() => _pendingZoom = null),
+                          ),
+                          _slider(
+                            theme, 'Exposure (EV)', '${evVal >= 0 ? '+' : ''}${evVal.toStringAsFixed(1)} EV', evVal, -2.0, 2.0,
+                            divisions: 16,
+                            onChanged: canHw ? (v) { setState(() => _pendingExposure = v); sendCmd(RemoteCameraCommand(command: .exposure, value: v)); } : null,
+                            onEnd: (_) => setState(() => _pendingExposure = null),
+                          ),
+                        ],
+                      ),
+                      _sectionBox(
+                        colors,
+                        children: [
+                          _sectionTitle(
+                            theme,
+                            'Studio Framing & GPU Color',
+                            'Aspect crop, Rule-of-Thirds grid, pan & look',
+                            trailing: TextButton.icon(
+                              onPressed: () => isPrimary
+                                  ? primaryNotifier.resetFramingAndColor()
+                                  : updateSecondary((c) => c.copyWith(aspectPreset: .free, digitalZoom: 1.0, panX: 0.0, panY: 0.0, brightness: 0.0, contrast: 1.0, saturation: 1.0)),
+                              style: TextButton.styleFrom(padding: const .symmetric(horizontal: 8, vertical: 4)),
+                              icon: const Icon(Icons.restart_alt_rounded, size: 16),
+                              label: const Text('Reset Studio Look'),
+                            ),
+                          ),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              for (final preset in AspectPreset.values)
+                                ChoiceChip(
+                                  label: Text(preset.label),
+                                  selected: display.aspectPreset == preset,
+                                  showCheckmark: false,
+                                  onSelected: (_) => isPrimary
+                                      ? primaryNotifier.setAspectPreset(preset)
+                                      : updateSecondary((c) => c.copyWith(aspectPreset: preset)),
+                                ),
+                              FilterChip(
+                                avatar: const Icon(Icons.grid_3x3_rounded, size: 15),
+                                label: const Text('3x3 Grid'),
+                                selected: display.showGrid,
+                                onSelected: (v) => isPrimary
+                                    ? primaryNotifier.toggleGrid()
+                                    : updateSecondary((c) => c.copyWith(showGrid: v)),
+                              ),
+                            ],
+                          ),
+                          for (final s in framingSliders)
+                            _slider(theme, s.$1, s.$2, s.$3, s.$4, s.$5, onChanged: s.$6),
+                        ],
                       ),
                     ],
                   ),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final preset in AspectPreset.values)
-                        ChoiceChip(
-                          label: Text(preset.label),
-                          selected: display.aspectPreset == preset,
-                          showCheckmark: false,
-                          onSelected: (_) => isPrimary
-                              ? primaryNotifier.setAspectPreset(preset)
-                              : updateSecondary((c) => c.copyWith(aspectPreset: preset)),
-                        ),
-                      FilterChip(
-                        avatar: const Icon(Icons.grid_3x3_rounded, size: 16),
-                        label: const Text('3x3 Grid'),
-                        selected: display.showGrid,
-                        onSelected: (v) => isPrimary
-                            ? primaryNotifier.toggleGrid()
-                            : updateSecondary((c) => c.copyWith(showGrid: v)),
-                      ),
-                    ],
-                  ),
-                  for (final s in framingSliders)
-                    _slider(theme, s.$1, s.$2, s.$3, s.$4, s.$5, onChanged: s.$6),
-                ],
+                ),
               ),
             ),
           ),
@@ -193,7 +240,7 @@ class _RemoteCameraPanelState extends ConsumerState<RemoteCameraPanel> {
   }
 
   Widget _buildHeader(ThemeData theme, bool isPrimary, String targetName) => Padding(
-    padding: const .fromLTRB(20, 14, 12, 8),
+    padding: const .fromLTRB(16, 10, 10, 6),
     child: Row(
       spacing: 10,
       children: [
@@ -237,11 +284,30 @@ class _RemoteCameraPanelState extends ConsumerState<RemoteCameraPanel> {
     ref.read(multiCamProvider.notifier).selectSlot(id);
   }
 
-  Widget _sectionTitle(ThemeData theme, String title, String subtitle) => Column(
+  Widget _sectionBox(ColorScheme colors, {required List<Widget> children}) => Container(
+    padding: const .all(12),
+    decoration: BoxDecoration(
+      color: colors.surfaceContainer.withValues(alpha: 0.55),
+      borderRadius: .circular(16),
+      border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.55)),
+    ),
+    child: Column(crossAxisAlignment: .stretch, spacing: 8, children: children),
+  );
+
+  Widget _sectionTitle(ThemeData theme, String title, String subtitle, {Widget? trailing}) => Column(
     crossAxisAlignment: .start,
     spacing: 2,
     children: [
-      Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: .w700)),
+      if (trailing != null)
+        Row(
+          spacing: 8,
+          children: [
+            Expanded(child: Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: .w700))),
+            trailing,
+          ],
+        )
+      else
+        Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: .w700)),
       Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
     ],
   );
@@ -249,7 +315,7 @@ class _RemoteCameraPanelState extends ConsumerState<RemoteCameraPanel> {
   Widget _rigChip(ColorScheme colors, IconData icon, String label, bool active, bool enabled, VoidCallback onTap, {Color? accent}) {
     final tone = active ? (accent ?? colors.primary) : null;
     return FilterChip(
-      avatar: Icon(icon, size: 17, color: tone),
+      avatar: Icon(icon, size: 16, color: tone),
       label: Text(label),
       selected: active,
       showCheckmark: false,
@@ -268,7 +334,10 @@ class _RemoteCameraPanelState extends ConsumerState<RemoteCameraPanel> {
           Text(text, style: theme.textTheme.labelMedium?.copyWith(fontFeatures: const [FontFeature.tabularFigures()])),
         ],
       ),
-      Slider(value: value, min: min, max: max, divisions: divisions, onChanged: onChanged, onChangeEnd: onEnd),
+      SizedBox(
+        height: 28,
+        child: Slider(value: value, min: min, max: max, divisions: divisions, onChanged: onChanged, onChangeEnd: onEnd),
+      ),
     ],
   );
 }

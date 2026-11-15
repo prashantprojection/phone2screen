@@ -68,11 +68,7 @@ class _SourcePickerCardState extends ConsumerState<SourcePickerCard> {
                   width: 26,
                   height: 26,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: colors.primary.withValues(alpha: 0.16),
-                    shape: .circle,
-                    border: Border.all(color: colors.primary.withValues(alpha: 0.45)),
-                  ),
+                  decoration: BoxDecoration(color: colors.primary.withValues(alpha: 0.12), shape: .circle),
                   child: Text('1', style: TextStyle(color: colors.primary, fontSize: 13, fontWeight: .w800)),
                 ),
                 Expanded(child: Text('What to Share', style: theme.textTheme.titleMedium?.copyWith(fontWeight: .w700))),
@@ -108,6 +104,8 @@ class _SourcePickerCardState extends ConsumerState<SourcePickerCard> {
                 if (isCam) ...[
                   ChoiceChip(
                     showCheckmark: false,
+                    shape: const StadiumBorder(),
+                    side: BorderSide(color: (config.cameraLens == .back ? colors.primary : colors.outlineVariant).withValues(alpha: 0.5)),
                     avatar: const Icon(Icons.camera_rear_outlined, size: 17),
                     label: const Text('Back'),
                     selected: config.cameraLens == .back,
@@ -115,6 +113,8 @@ class _SourcePickerCardState extends ConsumerState<SourcePickerCard> {
                   ),
                   ChoiceChip(
                     showCheckmark: false,
+                    shape: const StadiumBorder(),
+                    side: BorderSide(color: (config.cameraLens == .front ? colors.primary : colors.outlineVariant).withValues(alpha: 0.5)),
                     avatar: const Icon(Icons.camera_front_outlined, size: 17),
                     label: const Text('Front'),
                     selected: config.cameraLens == .front,
@@ -123,6 +123,8 @@ class _SourcePickerCardState extends ConsumerState<SourcePickerCard> {
                 ],
                 FilterChip(
                   showCheckmark: false,
+                  shape: const StadiumBorder(),
+                  side: BorderSide(color: (config.enableAudio ? colors.primary : colors.outlineVariant).withValues(alpha: 0.5)),
                   avatar: Icon(config.enableAudio ? Icons.mic_rounded : Icons.mic_off_rounded, size: 17),
                   label: Text(config.enableAudio ? 'Mic On' : 'Mic Off'),
                   selected: config.enableAudio,
@@ -135,8 +137,8 @@ class _SourcePickerCardState extends ConsumerState<SourcePickerCard> {
                 padding: const .symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: colors.surfaceContainer,
-                  borderRadius: .circular(10),
-                  border: Border.all(color: colors.outlineVariant),
+                  borderRadius: .circular(12),
+                  border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.45)),
                 ),
                 child: Row(
                   spacing: 10,
@@ -150,7 +152,7 @@ class _SourcePickerCardState extends ConsumerState<SourcePickerCard> {
                       ),
                     ),
                     OutlinedButton(
-                      style: OutlinedButton.styleFrom(padding: const .symmetric(horizontal: 14, vertical: 8)),
+                      style: OutlinedButton.styleFrom(shape: const StadiumBorder(), padding: const .symmetric(horizontal: 14, vertical: 8)),
                       onPressed: _pickDesktopSource,
                       child: const Text('Pick'),
                     ),
@@ -161,28 +163,28 @@ class _SourcePickerCardState extends ConsumerState<SourcePickerCard> {
               crossAxisAlignment: .start,
               spacing: 8,
               children: [
-                Row(
-                  spacing: 8,
-                  children: [
-                    Expanded(
-                      child: Text(
+                SizedBox(
+                  width: double.infinity,
+                  child: Wrap(
+                    alignment: .spaceBetween,
+                    crossAxisAlignment: .center,
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      Text(
                         'Rig Presets',
                         style: theme.textTheme.labelMedium?.copyWith(color: colors.onSurfaceVariant, fontWeight: .w600),
                       ),
-                    ),
-                    Container(
-                      padding: const .symmetric(horizontal: 9, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: colors.primary.withValues(alpha: 0.11),
-                        borderRadius: .circular(999),
-                        border: Border.all(color: colors.primary.withValues(alpha: 0.28)),
+                      Container(
+                        padding: const .symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(color: colors.primary.withValues(alpha: 0.11), borderRadius: .circular(999)),
+                        child: Text(
+                          _formatSummary(config),
+                          style: theme.textTheme.labelSmall?.copyWith(color: colors.primary, fontWeight: .w700),
+                        ),
                       ),
-                      child: Text(
-                        _formatSummary(config),
-                        style: theme.textTheme.labelSmall?.copyWith(color: colors.primary, fontWeight: .w700),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 const RigPresetsStrip(),
               ],
@@ -208,16 +210,19 @@ class const _SourceOptionCard({
     final accent = colors.primary;
 
     return Material(
-      color: selected ? accent.withValues(alpha: 0.13) : colors.surfaceContainer,
+      color: selected ? accent.withValues(alpha: 0.11) : colors.surfaceContainer,
       shape: RoundedRectangleBorder(
-        borderRadius: .circular(14),
-        side: BorderSide(color: selected ? accent : colors.outlineVariant, width: selected ? 1.5 : 1),
+        borderRadius: .circular(16),
+        side: BorderSide(
+          color: selected ? accent.withValues(alpha: 0.72) : colors.outlineVariant.withValues(alpha: 0.42),
+          width: selected ? 1.5 : 1,
+        ),
       ),
       clipBehavior: .antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const .symmetric(horizontal: 12, vertical: 12),
+          padding: const .symmetric(horizontal: 13, vertical: 13),
           child: Column(
             crossAxisAlignment: .start,
             spacing: 8,
@@ -228,15 +233,15 @@ class const _SourceOptionCard({
                   Container(
                     padding: const .all(8),
                     decoration: BoxDecoration(
-                      color: selected ? accent.withValues(alpha: 0.18) : colors.surface,
-                      borderRadius: .circular(10),
+                      color: selected ? accent.withValues(alpha: 0.16) : colors.surface,
+                      borderRadius: .circular(11),
                     ),
                     child: Icon(icon, size: 20, color: selected ? accent : colors.onSurfaceVariant),
                   ),
                   Icon(
                     selected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
                     size: 18,
-                    color: selected ? accent : colors.outline,
+                    color: selected ? accent : colors.outline.withValues(alpha: 0.65),
                   ),
                 ],
               ),

@@ -40,10 +40,11 @@ abstract final class AppTheme {
     );
 
     final cardShape = RoundedRectangleBorder(
-      borderRadius: .circular(16),
-      side: BorderSide(color: border),
+      borderRadius: .circular(20),
+      side: BorderSide(color: border.withValues(alpha: isDark ? 0.6 : 0.85)),
     );
     final controlShape = RoundedRectangleBorder(borderRadius: .circular(12));
+    const buttonPadding = EdgeInsets.symmetric(horizontal: 20, vertical: 13);
 
     return ThemeData(
       useMaterial3: true,
@@ -65,22 +66,33 @@ abstract final class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          shape: controlShape,
-          padding: const .symmetric(horizontal: 20, vertical: 14),
+          shape: const StadiumBorder(),
+          padding: buttonPadding,
           elevation: 0,
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          shape: controlShape,
-          padding: const .symmetric(horizontal: 20, vertical: 14),
+          shape: const StadiumBorder(),
+          padding: buttonPadding,
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          shape: controlShape,
+          shape: const StadiumBorder(),
           side: BorderSide(color: border),
-          padding: const .symmetric(horizontal: 20, vertical: 14),
+          padding: buttonPadding,
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        shape: const StadiumBorder(),
+        side: BorderSide(color: border.withValues(alpha: 0.65)),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: surface,
+        surfaceTintColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(
+          borderRadius: .vertical(top: .circular(24)),
         ),
       ),
       inputDecorationTheme: InputDecorationThemeData(
@@ -99,7 +111,10 @@ abstract final class AppTheme {
           borderSide: const BorderSide(color: AppColors.primaryBlue, width: 1.5),
         ),
       ),
-      dividerTheme: DividerThemeData(color: border, thickness: 1),
+      dividerTheme: DividerThemeData(
+        color: border.withValues(alpha: 0.65),
+        thickness: 1,
+      ),
       dialogTheme: DialogThemeData(backgroundColor: surface, shape: cardShape),
       snackBarTheme: SnackBarThemeData(
         behavior: .floating,

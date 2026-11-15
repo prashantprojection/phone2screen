@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/platform_provider.dart';
 import 'providers/preferences_provider.dart';
+import 'providers/session_provider.dart';
 import 'providers/settings_provider.dart';
 import 'views/receiver/receiver_screen.dart';
 import 'views/sender/sender_screen.dart';
@@ -40,9 +41,13 @@ class _Phone2ScreenAppState extends ConsumerState<Phone2ScreenApp> {
     final settings = ref.watch(appSettingsProvider);
     final activeRole = ref.watch(activeRoleProvider);
     final viewerDisplay = ref.watch(viewerDisplayProvider);
+    final sessionPhase = ref.watch(sessionProvider.select((s) => s.phase));
     final hideHeader =
-        activeRole == .receiver &&
-        (viewerDisplay.isFullscreen || viewerDisplay.cleanFeedMode);
+        (activeRole == .receiver &&
+            (viewerDisplay.isFullscreen || viewerDisplay.cleanFeedMode)) ||
+        (activeRole == .sender &&
+            settings.ecoDimPreview &&
+            sessionPhase == .streaming);
 
     return MaterialApp(
       title: launchArgs.windowTitle ?? 'Phone2Screen',

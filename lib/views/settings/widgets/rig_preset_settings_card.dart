@@ -67,7 +67,7 @@ class const RigPresetSettingsCard({super.key}) extends ConsumerWidget {
                   width: 34,
                   height: 34,
                   decoration: BoxDecoration(
-                    color: colors.primary.withValues(alpha: 0.13),
+                    color: colors.primary.withValues(alpha: 0.11),
                     borderRadius: .circular(10),
                   ),
                   child: Icon(Icons.bookmark_add_outlined, size: 18, color: colors.primary),
@@ -84,8 +84,9 @@ class const RigPresetSettingsCard({super.key}) extends ConsumerWidget {
                 ),
                 FilledButton.tonalIcon(
                   style: FilledButton.styleFrom(
+                    shape: const StadiumBorder(),
                     visualDensity: .compact,
-                    padding: const .symmetric(horizontal: 12, vertical: 8),
+                    padding: const .symmetric(horizontal: 14, vertical: 9),
                   ),
                   onPressed: () => _promptSavePreset(context, ref, config),
                   icon: const Icon(Icons.add_rounded, size: 18),
@@ -105,7 +106,7 @@ class const RigPresetSettingsCard({super.key}) extends ConsumerWidget {
             ),
           ] else
             for (final preset in customPresets) ...[
-              const Divider(height: 1, indent: 52),
+              const Divider(height: 1, indent: 62),
               ListTile(
                 leading: Icon(
                   _matchesConfig(preset, config) ? Icons.check_circle_rounded : Icons.tune_rounded,
@@ -178,7 +179,11 @@ class _SaveRigPresetDialogState extends State<_SaveRigPresetDialog> {
     ),
     actions: [
       TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-      FilledButton(onPressed: _save, child: const Text('Save')),
+      FilledButton(
+        style: FilledButton.styleFrom(shape: const StadiumBorder()),
+        onPressed: _save,
+        child: const Text('Save'),
+      ),
     ],
   );
 }

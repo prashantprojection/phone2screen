@@ -44,7 +44,7 @@ class const WebBroadcastLobbyView({super.key, required final SessionState sessio
       requiresPin: endpoint?.requiresPin ?? false,
       pin: pin,
     );
-    final stagePanel = _PreviewStage(stream: session.localStream);
+    final isWide = context.isExpanded;
 
     return Center(
       child: ConstrainedBox(
@@ -61,24 +61,31 @@ class const WebBroadcastLobbyView({super.key, required final SessionState sessio
                   onDismiss: () => ref.read(sessionProvider.notifier).clearError(),
                 ),
               Expanded(
-                child: context.isExpanded
+                child: isWide
                     ? Row(
                         crossAxisAlignment: .stretch,
                         spacing: 20,
                         children: [
                           Expanded(flex: 5, child: _buildInfoCard(context, url, obsUrl)),
-                          Expanded(flex: 6, child: stagePanel),
+                          Expanded(
+                            flex: 6,
+                            child: _PreviewStage(
+                              stream: session.localStream,
+                              overlayControls: const ActiveSenderControls(),
+                            ),
+                          ),
                         ],
                       )
                     : LayoutBuilder(
                         builder: (context, constraints) {
                           final infoCard = _buildInfoCard(context, url, obsUrl);
+                          final stage = _PreviewStage(stream: session.localStream);
                           if (constraints.maxHeight < 560) {
                             return SingleChildScrollView(
                               child: Column(
                                 crossAxisAlignment: .stretch,
                                 spacing: 12,
-                                children: [infoCard, SizedBox(height: 220, child: stagePanel)],
+                                children: [infoCard, SizedBox(height: 220, child: stage), const ActiveSenderControls()],
                               ),
                             );
                           }
@@ -87,16 +94,16 @@ class const WebBroadcastLobbyView({super.key, required final SessionState sessio
                             spacing: 12,
                             children: [
                               ConstrainedBox(
-                                constraints: BoxConstraints(maxHeight: constraints.maxHeight * 0.64),
+                                constraints: BoxConstraints(maxHeight: constraints.maxHeight * 0.56),
                                 child: infoCard,
                               ),
-                              Expanded(child: stagePanel),
+                              Expanded(child: stage),
+                              const ActiveSenderControls(),
                             ],
                           );
                         },
                       ),
               ),
-              const ActiveSenderControls(),
             ],
           ),
         ),
@@ -116,20 +123,23 @@ class const WebBroadcastLobbyView({super.key, required final SessionState sessio
           children: [
             Center(
               child: Container(
-                padding: const .symmetric(horizontal: 11, vertical: 5),
+                padding: const .symmetric(horizontal: 12, vertical: 5),
                 decoration: BoxDecoration(
-                  color: AppColors.accentGreen.withValues(alpha: 0.14),
+                  color: AppColors.accentGreen.withValues(alpha: 0.12),
                   borderRadius: .circular(999),
-                  border: Border.all(color: AppColors.accentGreen.withValues(alpha: 0.4)),
                 ),
                 child: const Row(
                   mainAxisSize: .min,
                   spacing: 6,
                   children: [
                     Icon(Icons.public_rounded, size: 15, color: AppColors.accentGreen),
-                    Text(
-                      'Ready for Browser Viewer',
-                      style: TextStyle(color: AppColors.accentGreen, fontSize: 12, fontWeight: .w700),
+                    Flexible(
+                      child: Text(
+                        'Ready for Browser Viewer',
+                        maxLines: 1,
+                        overflow: .ellipsis,
+                        style: TextStyle(color: AppColors.accentGreen, fontSize: 12, fontWeight: .w700),
+                      ),
                     ),
                   ],
                 ),
@@ -191,22 +201,26 @@ class const _CopyLinkCard({
     return Material(
       color: colors.surfaceContainer,
       shape: RoundedRectangleBorder(
-        borderRadius: .circular(12),
-        side: BorderSide(color: url.isNotEmpty ? accent.withValues(alpha: 0.45) : colors.outlineVariant),
+        borderRadius: .circular(14),
+        side: BorderSide(color: url.isNotEmpty ? accent.withValues(alpha: 0.35) : colors.outlineVariant.withValues(alpha: 0.45)),
       ),
       clipBehavior: .antiAlias,
       child: InkWell(
         onTap: onCopy,
         child: Padding(
-          padding: const .symmetric(horizontal: 12, vertical: 10),
+          padding: const .symmetric(horizontal: 14, vertical: 11),
           child: Column(
             crossAxisAlignment: .start,
-            spacing: 5,
+            spacing: 6,
             children: [
               Row(
                 spacing: 8,
                 children: [
-                  Icon(icon, size: 16, color: badgeAccent),
+                  Container(
+                    padding: const .all(5),
+                    decoration: BoxDecoration(color: badgeAccent.withValues(alpha: 0.14), borderRadius: .circular(8)),
+                    child: Icon(icon, size: 15, color: badgeAccent),
+                  ),
                   Expanded(
                     child: Text(
                       title,
@@ -217,7 +231,7 @@ class const _CopyLinkCard({
                   ),
                   if (badge case final badgeText?)
                     Container(
-                      padding: const .symmetric(horizontal: 7, vertical: 2),
+                      padding: const .symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(colors: [accent, badgeAccent]),
                         borderRadius: .circular(999),
@@ -255,34 +269,67 @@ class const _CopyLinkCard({
   }
 }
 
-class const _PreviewStage({required final MediaStream? stream}) extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) => Stack(
-    children: [
-      Positioned.fill(child: VideoStageWidget(stream: stream, waitingLabel: 'Starting camera or screen...')),
-      Positioned(
-        top: 12,
-        left: 12,
-        child: Container(
-          padding: const .symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: AppColors.backgroundDark.withValues(alpha: 0.72),
-            borderRadius: .circular(999),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
-          ),
-          child: Row(
-            mainAxisSize: .min,
-            spacing: 6,
-            children: [
-              Container(width: 7, height: 7, decoration: const BoxDecoration(color: AppColors.cyanAccent, shape: .circle)),
-              const Text(
-                'Live Preview',
-                style: TextStyle(color: AppColors.textPrimaryDark, fontSize: 12, fontWeight: .w600),
-              ),
-            ],
+class const _PreviewStage({
+  required final MediaStream? stream,
+  final Widget? overlayControls,
+}) extends StatelessWidget {
+  Widget _stageScrim({required bool top}) => Positioned(
+    top: top ? 0 : null,
+    bottom: top ? null : 0,
+    left: 0,
+    right: 0,
+    height: top ? 60 : 92,
+    child: IgnorePointer(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: top ? Alignment.topCenter : Alignment.bottomCenter,
+            end: top ? Alignment.bottomCenter : Alignment.topCenter,
+            colors: [Colors.black.withValues(alpha: 0.50), Colors.transparent],
           ),
         ),
       ),
-    ],
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+    borderRadius: .circular(20),
+    child: ColoredBox(
+      color: Colors.black,
+      child: Stack(
+        fit: .expand,
+        children: [
+          Positioned.fill(
+            child: VideoStageWidget(stream: stream, borderRadius: 0, waitingLabel: 'Starting camera or screen...'),
+          ),
+          _stageScrim(top: true),
+          Positioned(
+            top: 12,
+            left: 12,
+            child: Container(
+              padding: const .symmetric(horizontal: 11, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF14161A).withValues(alpha: 0.80),
+                borderRadius: .circular(999),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+              ),
+              child: Row(
+                mainAxisSize: .min,
+                spacing: 6,
+                children: [
+                  Container(width: 7, height: 7, decoration: const BoxDecoration(color: AppColors.cyanAccent, shape: .circle)),
+                  const Text('Live Preview', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: .w600)),
+                ],
+              ),
+            ),
+          ),
+          if (overlayControls case final controls?) ...[
+            _stageScrim(top: false),
+            Positioned(left: 14, right: 14, bottom: 14, child: controls),
+          ],
+        ],
+      ),
+    ),
   );
 }

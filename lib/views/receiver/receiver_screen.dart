@@ -58,7 +58,6 @@ class _ReceiverScreenState extends ConsumerState<ReceiverScreen> {
       );
     }
 
-    final theme = Theme.of(context);
     final endpoint = session.activeEndpoint;
     final launchArgs = ref.watch(windowLaunchArgsProvider);
     final isDesktop = !platform.isWeb && platform.isDesktop;
@@ -84,15 +83,13 @@ class _ReceiverScreenState extends ConsumerState<ReceiverScreen> {
                   onRetry: () => ref.read(sessionProvider.notifier).restartHosting(),
                   onDismiss: () => ref.read(sessionProvider.notifier).clearError(),
                 ),
-              Column(
-                crossAxisAlignment: .start,
-                spacing: 4,
-                children: [
-                  Text(heading, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: .w700)),
-                  Text(subtitle, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                ],
+              _LobbyHeader(
+                heading: heading,
+                subtitle: subtitle,
+                isDesktop: isDesktop,
+                launchArgs: launchArgs,
+                multiCam: multiCam,
               ),
-              if (isDesktop) _MultiCamWindowsBar(launchArgs: launchArgs, multiCam: multiCam),
               LayoutBuilder(
                 builder: (context, constraints) {
                   final wide = context.isExpanded || constraints.maxWidth >= 860;
@@ -124,7 +121,10 @@ class _ReceiverScreenState extends ConsumerState<ReceiverScreen> {
   }
 }
 
-class const _MultiCamWindowsBar({
+class const _LobbyHeader({
+  required final String heading,
+  required final String subtitle,
+  required final bool isDesktop,
   required final WindowLaunchArgs launchArgs,
   required final MultiCamState multiCam,
 }) extends ConsumerWidget {
@@ -134,48 +134,78 @@ class const _MultiCamWindowsBar({
     final colors = theme.colorScheme;
     final notifier = ref.read(multiCamProvider.notifier);
     final canOpen = multiCam.childWindows.length < StreamConstants.maxDesktopReceiverPeers - 1;
+    final showSecondaryChip = isDesktop && launchArgs.isSecondaryCameraWindow;
+    final showAction = isDesktop && !launchArgs.isSecondaryCameraWindow;
+    final hasChips = showSecondaryChip || (isDesktop && multiCam.childWindows.isNotEmpty);
 
-    return Card(
-      child: Padding(
-        padding: const .symmetric(horizontal: 16, vertical: 12),
-        child: Wrap(
-          alignment: .spaceBetween,
-          crossAxisAlignment: .center,
-          spacing: 10,
-          runSpacing: 8,
-          children: [
-            Wrap(
-              crossAxisAlignment: .center,
-              spacing: 8,
-              runSpacing: 6,
+    return Column(
+      crossAxisAlignment: .stretch,
+      spacing: 10,
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final titleBlock = Column(
+              crossAxisAlignment: .start,
+              spacing: 4,
               children: [
-                const Icon(Icons.grid_view_rounded, size: 18, color: AppColors.cyanAccent),
-                Text('Multi-Camera & OBS Windows', style: theme.textTheme.titleSmall?.copyWith(fontWeight: .w700)),
-                if (launchArgs.isSecondaryCameraWindow)
-                  Chip(
-                    visualDensity: .compact,
-                    backgroundColor: AppColors.cyanAccent.withValues(alpha: 0.16),
-                    label: Text('Camera Slot ${launchArgs.cameraSlot}', style: const TextStyle(color: AppColors.cyanAccent, fontWeight: .w700)),
-                  ),
-                for (final win in multiCam.childWindows)
-                  InputChip(
-                    visualDensity: .compact,
-                    label: Text('Cam ${win.slot} (:${win.port})'),
-                    deleteIcon: const Icon(Icons.close_rounded, size: 16),
-                    onDeleted: () => notifier.closeCameraWindow(win.slot),
-                  ),
+                Text(heading, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: .w700)),
+                Text(subtitle, style: theme.textTheme.bodyMedium?.copyWith(color: colors.onSurfaceVariant)),
               ],
-            ),
-            if (!launchArgs.isSecondaryCameraWindow)
-              FilledButton.tonalIcon(
-                onPressed: canOpen ? () => notifier.openCameraWindow() : null,
-                style: FilledButton.styleFrom(visualDensity: .compact),
-                icon: Icon(Icons.open_in_new_rounded, size: 17, color: colors.primary),
-                label: const Text('+ Open Camera Window'),
+            );
+            if (!showAction) return titleBlock;
+            final actionButton = FilledButton.tonalIcon(
+              onPressed: canOpen ? () => notifier.openCameraWindow() : null,
+              style: FilledButton.styleFrom(
+                visualDensity: .compact,
+                shape: const StadiumBorder(),
+                padding: const .symmetric(horizontal: 14, vertical: 10),
               ),
-          ],
+              icon: Icon(Icons.open_in_new_rounded, size: 17, color: colors.primary),
+              label: const Text('+ Open Camera Window'),
+            );
+            if (constraints.maxWidth >= 680) {
+              return Row(
+                crossAxisAlignment: .center,
+                spacing: 16,
+                children: [
+                  Expanded(child: titleBlock),
+                  actionButton,
+                ],
+              );
+            }
+            return Column(
+              crossAxisAlignment: .start,
+              spacing: 10,
+              children: [titleBlock, actionButton],
+            );
+          },
         ),
-      ),
+        if (hasChips)
+          Wrap(
+            crossAxisAlignment: .center,
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              if (showSecondaryChip)
+                Chip(
+                  visualDensity: .compact,
+                  backgroundColor: AppColors.cyanAccent.withValues(alpha: 0.16),
+                  side: BorderSide(color: AppColors.cyanAccent.withValues(alpha: 0.45)),
+                  label: Text(
+                    'Camera Slot ${launchArgs.cameraSlot}',
+                    style: const TextStyle(color: AppColors.cyanAccent, fontWeight: .w700),
+                  ),
+                ),
+              for (final win in multiCam.childWindows)
+                InputChip(
+                  visualDensity: .compact,
+                  label: Text('Cam ${win.slot} (:${win.port})'),
+                  deleteIcon: const Icon(Icons.close_rounded, size: 16),
+                  onDeleted: () => notifier.closeCameraWindow(win.slot),
+                ),
+            ],
+          ),
+      ],
     );
   }
 }

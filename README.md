@@ -3,7 +3,7 @@
 **Phone2Screen** turns 1–4 phones into low-latency LAN or USB webcams and screen broadcasters for **Windows PC**, **OBS Studio**, and **any Web Browser** — completely offline, with zero accounts, zero cloud servers, and zero watermarks.
 
 - **Private & Offline**: Video travels peer-to-peer over your Wi-Fi, mobile hotspot, USB tethering, or ADB USB cable.
-- **Studio-Ready**: Multi-camera grid (`Solo` / `2-Up` / `4-Up`), multi-window desktop receivers, zero-UI OBS Browser Source (`/obs`), and remote tripod camera controls.
+- **Studio-Ready**: Edge-to-edge Theater/OBS video stage with floating glass control docks, multi-camera grid (`Solo` / `2-Up` / `4-Up`), multi-window desktop receivers, zero-UI OBS Browser Source (`/obs`), and a non-blocking Studio Inspector drawer.
 - **Bidirectional Single App**: One codebase switches in one tap between **Receive** and **Send**.
 
 ---
@@ -42,8 +42,8 @@
 4. Hidden cursor (`cursor: none`), H.264 priority, and automatic **1500 ms reconnect** recover cleanly if your phone stream restarts.
 
 ### Option B: PC Receiver Clean Window Mode (`B`)
-1. Connect your phone(s) to the PC **Receive** app over Wi-Fi or USB.
-2. Press **`B`** (or click **OBS Clean** on the receiver dock) to hide the header, dock, and overlays for clean **OBS Window Capture**.
+1. Connect your phone(s) to the PC **Receive** app over Wi-Fi or USB for an edge-to-edge Theater/OBS stage with a floating glass control dock.
+2. Press **`B`** (or click **OBS Clean** on the floating receiver dock) to hide the header, dock, and overlays for clean **OBS Window Capture**.
 3. Double-click the video or press **`Esc`** (or **`B`**) to bring controls back.
 
 ---
@@ -68,9 +68,9 @@
 
 ## Streamer Rig Controls, Framing, Tally & Persistence
 
-- **Remote Tripod Camera Rig (`V` / Camera Rig)**: Control your mounted phone live over the `phone2screen-control` DataChannel (`cam_ctrl`/`cam_state`) without touching the phone: **Flip Lens**, **Torch**, **Mic Mute**, **AF Lock**, **1x / 2x / 3x Zoom** + slider, and **Exposure (`-2.0..+2.0 EV`)** *(hardware lens controls require a native mobile camera stream)*.
+- **Non-Blocking Studio Inspector & Remote Tripod Camera Rig (`V` / Camera Rig)**: Opens as a right-side Studio Inspector drawer on desktop (keeping the live video visible as you adjust controls) or a bottom sheet on phones. Control your mounted phone live over the `phone2screen-control` DataChannel (`cam_ctrl`/`cam_state`) without touching the phone: **Flip Lens**, **Torch**, **Mic Mute**, **AF Lock**, **1x / 2x / 3x Zoom** + slider, and **Exposure (`-2.0..+2.0 EV`)** *(hardware lens controls require a native mobile camera stream)*.
 - **Studio Framing & GPU Color Look**: Adjust per-camera **Free / 16:9 / 9:16 / 4:3** aspect crop, **3x3 Grid** (Rule of Thirds), **Digital Zoom (`1.0x–3.0x`)**, **Pan X / Y**, **Brightness**, **Contrast**, and **Saturation**, or tap **Reset Studio Look**.
-- **True-Black OLED On-Air Tally (`OledTallyView`)**: Toggle **Battery Saver Preview** (in **Settings → Video & Audio** or the live **Battery Saver** pill) to switch the phone into a pure `#000000` OLED-safe **ON AIR** tally screen with 30-second anti-burn-in pixel shift, elapsed timer, stream summary, and **Wake Preview** / double-tap wake.
+- **True-Black OLED On-Air Tally (`OledTallyView`)**: Toggle **Battery Saver Preview** (in **Settings → Video & Audio** or the live **Battery Saver** pill) to switch the phone into a pure `#000000` OLED-safe **ON AIR** tally screen—automatically hiding the top shell header with floating glass live controls, 30-second anti-burn-in pixel shift, elapsed timer, stream summary, and **Wake Preview** / double-tap wake.
 - **Streamer Camera Presets**: 1-tap presets on **Send** — `Facecam 1080p60`, `Overhead 4K`, `USB Ultra`, `Vertical Cam`, and `Eco 720p` — plus custom saved presets in **Settings → Streamer Presets**.
 - **Persistent Settings**: Theme, video/audio settings, custom presets, keyboard shortcuts, and your last connected receiver (**Reconnect to ...** quick tile on **Send**) are automatically saved locally as JSON with zero cloud sign-in.
 

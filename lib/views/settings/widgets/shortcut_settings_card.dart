@@ -30,7 +30,7 @@ class const ShortcutSettingsCard({super.key}) extends ConsumerWidget {
             secondary: Container(
               width: 34,
               height: 34,
-              decoration: BoxDecoration(color: colors.primary.withValues(alpha: 0.13), borderRadius: .circular(10)),
+              decoration: BoxDecoration(color: colors.primary.withValues(alpha: 0.11), borderRadius: .circular(10)),
               child: Icon(Icons.keyboard_alt_outlined, size: 18, color: colors.primary),
             ),
             title: const Text('Enable Keyboard Shortcuts'),
@@ -146,7 +146,11 @@ class const _ShortcutBindingCell({
 
     return Container(
       padding: const .symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(color: colors.surfaceContainer, borderRadius: .circular(10), border: Border.all(color: colors.outlineVariant)),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainer,
+        borderRadius: .circular(12),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.42)),
+      ),
       child: Row(
         spacing: 8,
         children: [
@@ -167,6 +171,7 @@ class const _ShortcutBindingCell({
               padding: const .symmetric(horizontal: 10, vertical: 6),
               visualDensity: .compact,
               shape: RoundedRectangleBorder(borderRadius: .circular(8)),
+              side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.72)),
               backgroundColor: colors.surface,
             ),
             onPressed: onEdit,
@@ -234,8 +239,8 @@ class _RecordShortcutDialogState extends State<_RecordShortcutDialog> {
               padding: const .all(14),
               decoration: BoxDecoration(
                 color: colors.surfaceContainer,
-                borderRadius: .circular(12),
-                border: Border.all(color: AppColors.primaryBlue.withValues(alpha: 0.45)),
+                borderRadius: .circular(14),
+                border: Border.all(color: AppColors.primaryBlue.withValues(alpha: 0.35)),
               ),
               child: Row(
                 mainAxisAlignment: .center,

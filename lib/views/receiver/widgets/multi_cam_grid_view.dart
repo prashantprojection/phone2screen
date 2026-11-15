@@ -28,61 +28,109 @@ class const MultiCamGridView({
     final isDesktop = !platform.isWeb && platform.isDesktop;
     final feeds = _buildFeedList(session, display, multiCam);
 
-    return Column(
-      crossAxisAlignment: .stretch,
-      spacing: 10,
-      children: [
-        _buildToolbar(context, multiCam, feeds, isDesktop, notifier),
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, c) => _buildGrid(
-              context,
-              ref,
-              multiCam.layout,
-              feeds,
-              multiCam.selectedPeerId,
-              display.showTelemetry,
-              c.maxWidth >= 680 && c.maxWidth >= c.maxHeight,
+    return ColoredBox(
+      color: const Color(0xFF07080A),
+      child: Column(
+        crossAxisAlignment: .stretch,
+        children: [
+          _buildToolbar(multiCam, feeds, isDesktop, notifier),
+          Expanded(
+            child: Padding(
+              padding: const .fromLTRB(3, 0, 3, 76),
+              child: LayoutBuilder(
+                builder: (context, c) => _buildGrid(
+                  context,
+                  ref,
+                  multiCam.layout,
+                  feeds,
+                  multiCam.selectedPeerId,
+                  display.showTelemetry,
+                  c.maxWidth >= 680 && c.maxWidth >= c.maxHeight,
+                ),
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  Widget _buildToolbar(BuildContext context, MultiCamState multiCam, List<_FeedItem> feeds, bool isDesktop, MultiCamNotifier notifier) {
-    final colors = Theme.of(context).colorScheme;
+  Widget _buildToolbar(MultiCamState multiCam, List<_FeedItem> feeds, bool isDesktop, MultiCamNotifier notifier) {
     final canOpen = multiCam.childWindows.length < StreamConstants.maxDesktopReceiverPeers - 1;
-    return Row(
-      spacing: 8,
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            scrollDirection: .horizontal,
-            child: Row(
-              spacing: 6,
-              children: [
-                for (final mode in MultiCamLayout.values)
-                  ChoiceChip(label: Text(mode.label), selected: multiCam.layout == mode, showCheckmark: false, visualDensity: .compact, onSelected: (_) => notifier.setLayout(mode)),
-                if (multiCam.layout == .solo && feeds.length > 1) ...[
-                  Container(width: 1, height: 20, color: colors.outlineVariant),
-                  for (final f in feeds)
-                    ChoiceChip(label: Text('Cam ${f.slotNumber}'), selected: f.peerId == multiCam.selectedPeerId, showCheckmark: false, visualDensity: .compact, onSelected: (_) => notifier.selectSlot(f.peerId)),
+    return Padding(
+      padding: const .fromLTRB(14, 10, 14, 8),
+      child: Row(
+        spacing: 8,
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: .horizontal,
+              child: Row(
+                spacing: 6,
+                children: [
+                  for (final mode in MultiCamLayout.values)
+                    _studioChip(
+                      label: mode.label,
+                      selected: multiCam.layout == mode,
+                      onSelected: () => notifier.setLayout(mode),
+                    ),
+                  if (feeds.length > 1) ...[
+                    Container(width: 1, height: 20, color: Colors.white.withValues(alpha: 0.14)),
+                    for (final f in feeds)
+                      _studioChip(
+                        label: 'Cam ${f.slotNumber}',
+                        selected: f.peerId == multiCam.selectedPeerId,
+                        onSelected: () => notifier.selectSlot(f.peerId),
+                      ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
-        ),
-        if (isDesktop)
-          OutlinedButton.icon(
-            onPressed: canOpen ? () => _openWindow(context, notifier) : null,
-            style: OutlinedButton.styleFrom(visualDensity: .compact, padding: const .symmetric(horizontal: 12, vertical: 8)),
-            icon: const Icon(Icons.open_in_new_rounded, size: 16),
-            label: const Text('+ Cam Window'),
-          ),
-      ],
+          if (isDesktop)
+            Builder(
+              builder: (ctx) => OutlinedButton.icon(
+                onPressed: canOpen ? () => _openWindow(ctx, notifier) : null,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white.withValues(alpha: 0.92),
+                  disabledForegroundColor: Colors.white.withValues(alpha: 0.35),
+                  backgroundColor: const Color(0xFF14161A),
+                  side: BorderSide(color: Colors.white.withValues(alpha: 0.16)),
+                  shape: const StadiumBorder(),
+                  visualDensity: .compact,
+                  padding: const .symmetric(horizontal: 12, vertical: 8),
+                ),
+                icon: const Icon(Icons.open_in_new_rounded, size: 15),
+                label: const Text('+ Cam Window'),
+              ),
+            ),
+        ],
+      ),
     );
   }
+
+  Widget _studioChip({
+    required String label,
+    required bool selected,
+    required VoidCallback onSelected,
+  }) => ChoiceChip(
+    label: Text(label),
+    selected: selected,
+    showCheckmark: false,
+    visualDensity: .compact,
+    backgroundColor: const Color(0xFF14161A),
+    selectedColor: AppColors.cyanAccent.withValues(alpha: 0.22),
+    side: BorderSide(
+      color: selected ? AppColors.cyanAccent.withValues(alpha: 0.72) : Colors.white.withValues(alpha: 0.14),
+    ),
+    labelStyle: TextStyle(
+      color: selected ? AppColors.cyanAccent : Colors.white.withValues(alpha: 0.88),
+      fontSize: 12,
+      fontWeight: .w600,
+    ),
+    shape: RoundedRectangleBorder(borderRadius: .circular(999)),
+    onSelected: (_) => onSelected(),
+  );
 
   Future<void> _openWindow(BuildContext context, MultiCamNotifier notifier) async {
     final entry = await notifier.openCameraWindow();
@@ -123,29 +171,37 @@ class const MultiCamGridView({
     if (layout == .split2) {
       final sec = selectedPeerId != null ? feeds.indexWhere((f) => f.peerId == selectedPeerId) : 1;
       final children = [Expanded(child: tileFor(0)), Expanded(child: tileFor(sec > 0 ? sec : 1))];
-      return wideSplit ? Row(spacing: 10, children: children) : Column(spacing: 10, children: children);
+      return wideSplit ? Row(spacing: 3, children: children) : Column(spacing: 3, children: children);
     }
     return Column(
-      spacing: 10,
+      spacing: 3,
       children: [
-        Expanded(child: Row(spacing: 10, children: [Expanded(child: tileFor(0)), Expanded(child: tileFor(1))])),
-        Expanded(child: Row(spacing: 10, children: [Expanded(child: tileFor(2)), Expanded(child: tileFor(3))])),
+        Expanded(child: Row(spacing: 3, children: [Expanded(child: tileFor(0)), Expanded(child: tileFor(1))])),
+        Expanded(child: Row(spacing: 3, children: [Expanded(child: tileFor(2)), Expanded(child: tileFor(3))])),
       ],
     );
   }
 
   Widget _emptySlot(BuildContext context, int slotNumber) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
     return Container(
-      decoration: BoxDecoration(color: colors.surfaceContainer.withValues(alpha: 0.5), borderRadius: .circular(14), border: Border.all(color: colors.outlineVariant)),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111318),
+        borderRadius: .circular(4),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
       child: Center(
         child: Column(
           mainAxisSize: .min,
           spacing: 6,
           children: [
-            Icon(Icons.videocam_outlined, size: 28, color: colors.onSurfaceVariant),
-            Text('Camera $slotNumber Slot Ready', style: theme.textTheme.labelMedium?.copyWith(color: colors.onSurfaceVariant, fontWeight: .w600)),
+            Icon(Icons.videocam_outlined, size: 28, color: Colors.white.withValues(alpha: 0.38)),
+            Text(
+              'Camera $slotNumber Slot Ready',
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: Colors.white.withValues(alpha: 0.56),
+                fontWeight: .w600,
+              ),
+            ),
           ],
         ),
       ),
@@ -173,18 +229,26 @@ class const _CameraGridTile({
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final borderColor = selected ? AppColors.cyanAccent : Theme.of(context).colorScheme.outlineVariant;
+    final borderColor = selected ? AppColors.cyanAccent : Colors.white.withValues(alpha: 0.12);
     return GestureDetector(
       behavior: .opaque,
       onTap: onTap,
       onDoubleTap: onDoubleTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        decoration: BoxDecoration(borderRadius: .circular(14), border: Border.all(color: borderColor, width: selected ? 2.5 : 1)),
+        decoration: BoxDecoration(
+          borderRadius: .circular(4),
+          border: Border.all(color: borderColor, width: selected ? 2 : 1),
+        ),
         child: Stack(
           fit: .expand,
           children: [
-            VideoStageWidget(stream: item.stream, displayConfig: item.displayConfig, borderRadius: 12, waitingLabel: 'Connecting ${item.label}...'),
+            VideoStageWidget(
+              stream: item.stream,
+              displayConfig: item.displayConfig,
+              borderRadius: 2,
+              waitingLabel: 'Connecting ${item.label}...',
+            ),
             Positioned(
               top: 8,
               left: 8,
@@ -198,7 +262,7 @@ class const _CameraGridTile({
                     Container(
                       padding: const .symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: AppColors.backgroundDark.withValues(alpha: 0.78),
+                        color: const Color(0xFF121418).withValues(alpha: 0.78),
                         borderRadius: .circular(999),
                         border: Border.all(color: selected ? AppColors.cyanAccent.withValues(alpha: 0.85) : Colors.white.withValues(alpha: 0.16)),
                       ),
@@ -207,7 +271,13 @@ class const _CameraGridTile({
                         spacing: 6,
                         children: [
                           Container(width: 7, height: 7, decoration: BoxDecoration(color: selected ? AppColors.cyanAccent : AppColors.accentGreen, shape: .circle)),
-                          Text('Cam ${item.slotNumber} • ${item.label}', overflow: .ellipsis, style: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 11, fontWeight: .w600)),
+                          Flexible(
+                            child: Text(
+                              'Cam ${item.slotNumber} • ${item.label}',
+                              overflow: .ellipsis,
+                              style: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 11, fontWeight: .w600),
+                            ),
+                          ),
                           if (item.micMuted) const Icon(Icons.mic_off_rounded, size: 12, color: AppColors.accentOrange),
                         ],
                       ),
