@@ -12,6 +12,9 @@ add_executable(${BINARY_NAME} WIN32
   "studio_bridge.cpp"
   "studio_bridge.h"
   "utils.cpp"
+  "vcam_registry.cpp"
+  "vcam_registry.h"
+  "vcam_shared_mem.h"
   "win32_window.cpp"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
   "Runner.rc"
@@ -46,3 +49,28 @@ target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
+
+# DirectShow zero-OBS virtual camera COM DLL (`p2s_vcam.dll`).
+add_library(p2s_vcam SHARED
+  "vcam_dll.cpp"
+  "vcam_dll.def"
+  "vcam_filter.cpp"
+  "vcam_filter.h"
+  "vcam_pin.cpp"
+  "vcam_pin.h"
+  "vcam_registry.cpp"
+  "vcam_registry.h"
+  "vcam_shared_mem.h"
+)
+apply_standard_settings(p2s_vcam)
+target_compile_definitions(p2s_vcam PRIVATE "NOMINMAX")
+target_include_directories(p2s_vcam PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(p2s_vcam PRIVATE
+  "ole32.lib"
+  "oleaut32.lib"
+  "strmiids.lib"
+  "uuid.lib"
+  "advapi32.lib"
+  "gdi32.lib"
+)
+add_dependencies(${BINARY_NAME} p2s_vcam)

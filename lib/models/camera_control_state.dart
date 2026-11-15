@@ -11,6 +11,7 @@ enum RemoteCameraCommandType {
   exposure,
   focusLock,
   voiceMode,
+  videoPause,
 }
 
 /// Control command transmitted over the `phone2screen-control` DataChannel.
@@ -64,6 +65,7 @@ class const RemoteCameraState({
   final bool focusLocked = false,
   final bool controlsSupported = true,
   final bool voiceClean = true,
+  final bool videoPaused = false,
 }) {
   /// Returns an updated copy of [RemoteCameraState].
   RemoteCameraState copyWith({
@@ -77,6 +79,7 @@ class const RemoteCameraState({
     bool? focusLocked,
     bool? controlsSupported,
     bool? voiceClean,
+    bool? videoPaused,
   }) => RemoteCameraState(
     lens: lens ?? this.lens,
     torchOn: torchOn ?? this.torchOn,
@@ -88,6 +91,7 @@ class const RemoteCameraState({
     focusLocked: focusLocked ?? this.focusLocked,
     controlsSupported: controlsSupported ?? this.controlsSupported,
     voiceClean: voiceClean ?? this.voiceClean,
+    videoPaused: videoPaused ?? this.videoPaused,
   );
 
   /// Encodes this state as a `cam_state` JSON frame.
@@ -103,6 +107,7 @@ class const RemoteCameraState({
     'focusLocked': focusLocked,
     'controlsSupported': controlsSupported,
     'voiceClean': voiceClean,
+    'videoPaused': videoPaused,
   };
 
   /// Parses a `cam_state` JSON frame, returning `null` when invalid.
@@ -124,6 +129,7 @@ class const RemoteCameraState({
       focusLocked: _asBool(map['focusLocked']),
       controlsSupported: _asBool(map['controlsSupported'], true),
       voiceClean: _asBool(map['voiceClean'], true),
+      videoPaused: _asBool(map['videoPaused']),
     );
   }
 
@@ -141,7 +147,8 @@ class const RemoteCameraState({
           exposureOffset == other.exposureOffset &&
           focusLocked == other.focusLocked &&
           controlsSupported == other.controlsSupported &&
-          voiceClean == other.voiceClean;
+          voiceClean == other.voiceClean &&
+          videoPaused == other.videoPaused;
 
   @override
   int get hashCode => Object.hash(
@@ -155,6 +162,7 @@ class const RemoteCameraState({
     focusLocked,
     controlsSupported,
     voiceClean,
+    videoPaused,
   );
 }
 

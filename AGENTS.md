@@ -1,6 +1,6 @@
-# AGENTS.md — Phone2Screen v0.3
+# AGENTS.md — Phone2Screen v0.4
 
-AI agent context and engineering constraints for **Phone2Screen** (`com.example.phone2screen`), a LAN & USB WebRTC streamer webcam studio (Phone <-> PC Desktop, OBS Studio, and Web Browser).
+AI agent context and engineering constraints for **Phone2Screen** (`com.example.phone2screen`), a LAN & USB WebRTC streamer webcam studio (Phone <-> PC Desktop, DirectShow Virtual Webcam, OBS Studio, and Web Browser).
 
 ## Workspace Boundary
 
@@ -48,6 +48,18 @@ AI agent context and engineering constraints for **Phone2Screen** (`com.example.
   - Guarded under `FLUTTER_TEST` so real `adb` processes and loopback socket scans never run unless `processRunner` or `allowInTestOverride` is injected.
 - **GPU Studio Look Presets & Vignette (`StudioLookPreset`, `VideoStageWidget`)**:
   - `ViewerDisplayConfig` composes 4x5 `StudioLookPreset` matrices (`natural`, `streamPunch`, `warmKeylight`, `coolCyber`, `noirBw`) with user brightness/contrast/saturation; `VideoStageWidget` layers an `IgnorePointer` `RadialGradient` overlay when `vignette: true`.
+
+## v0.4 Native Virtual Camera, Modes & Release Packaging
+
+- **Zero-OBS DirectShow Virtual Camera (`p2s_vcam.dll`, `NativeVirtualCamNotifier`)**:
+  - Native DirectShow source filter (`windows/runner/vcam_*`, `p2s_vcam.dll` alongside `phone2screen.exe`) streams 1280x720 RGB24 frames via shared memory (`Local\Phone2ScreenVCamSharedV1`) with `0` Standby, `1` Live, and `2` Privacy Paused slates.
+  - Registered per-user in `HKCU` (no admin required) via `StudioBridge` (`WindowsStudioService`) or `scripts/setup_windows_webcam.ps1`, managed by `nativeVirtualCamProvider` (`lib/providers/virtual_cam_provider.dart`) with 20 fps `stageBoundaryKey` `RepaintBoundary` capture on `ReceiverStreamingStage` / `FullscreenStageView`.
+- **`Simple` vs `Studio` Progressive Disclosure (`WorkspaceMode`)**:
+  - `AppSettings.workspaceMode` defaults to `.simple`, surfacing `WorkspaceModePill` (`AppShellHeader` >= 880px Receiver, `ReceiverScreen` lobby, `SettingsScreen` Appearance) and `SimpleWebcamCard` (`Use as PC Webcam — No OBS Required`), while `.studio` reveals full multi-window (`+ Open Camera Window` / `+ Window`), `Virtual Cam & OBS` lobby launcher, `Live Stats`, and `Share Text` controls. `Camera Rig` stays accessible in both modes.
+- **Privacy Freeze-Frame (`P`) & Auto-Reconnect**:
+  - `ShortcutAction.toggleVideoPause` (`P`) and `Pause` / `Resume` controls toggle `ViewerDisplayConfig.isVideoPaused` / `SessionState.isVideoPaused` and sync `RemoteCameraCommandType.videoPause` (`cam_ctrl` / `cam_state.videoPaused`) bidirectionally, overlaying a frosted `#EB0B0E14` `Camera Paused` privacy slate on `VideoStageWidget` and switching `p2s_vcam.dll` to state `2`.
+  - `SessionSenderFlow` performs a 1-shot `650ms` auto-reconnect (`SessionPhase.reconnecting`, probing USB loopback first) on transient active-stream socket drops.
+- **Windows Release Packaging**: `scripts/package_windows.ps1` + `windows/packaging/phone2screen.iss` produce `dist/Phone2Screen-v0.4.0-Windows-x64.zip` (+ `.sha256`) and Inno Setup 6 non-admin `Phone2Screen-Setup-v0.4.0.exe`.
 
 ## Skills & Verification
 

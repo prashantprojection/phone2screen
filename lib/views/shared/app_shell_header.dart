@@ -9,6 +9,7 @@ import '../../providers/session_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/shortcut_provider.dart';
 import 'how_to_use_sheet.dart';
+import 'workspace_mode_pill.dart';
 
 /// Top bar with brand mark, live status pill, role switcher, guide, and settings.
 class const AppShellHeader({super.key, required final VoidCallback onOpenSettings})
@@ -37,6 +38,7 @@ class const AppShellHeader({super.key, required final VoidCallback onOpenSetting
           builder: (context, constraints) {
             final centered = constraints.maxWidth >= 720;
             final wide = constraints.maxWidth >= 680;
+            final showModePill = activeRole == .receiver && constraints.maxWidth >= 880;
             final compact = constraints.maxWidth < 460;
             final showTitle = constraints.maxWidth >= 500;
             final iconStyle = compact
@@ -82,6 +84,10 @@ class const AppShellHeader({super.key, required final VoidCallback onOpenSetting
               mainAxisSize: .min,
               spacing: compact ? 2 : 4,
               children: [
+                if (showModePill) ...[
+                  const WorkspaceModePill(compact: true),
+                  const SizedBox(width: 2),
+                ],
                 if (canFullscreen)
                   IconButton(
                     onPressed: () => ref.read(viewerDisplayProvider.notifier).toggleFullscreen(),
@@ -133,7 +139,11 @@ class const AppShellHeader({super.key, required final VoidCallback onOpenSetting
                         Expanded(
                           child: Align(
                             alignment: Alignment.centerRight,
-                            child: actions,
+                            child: FittedBox(
+                              fit: .scaleDown,
+                              alignment: Alignment.centerRight,
+                              child: actions,
+                            ),
                           ),
                         ),
                       ],

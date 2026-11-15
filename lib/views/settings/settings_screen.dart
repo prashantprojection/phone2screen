@@ -5,6 +5,7 @@ import '../../core/constants/stream_constants.dart';
 import '../../models/stream_config.dart';
 import '../../providers/settings_provider.dart';
 import '../shared/how_to_use_sheet.dart';
+import '../shared/workspace_mode_pill.dart';
 import 'widgets/rig_preset_settings_card.dart';
 import 'widgets/shortcut_settings_card.dart';
 
@@ -32,21 +33,30 @@ class const SettingsScreen({super.key}) extends ConsumerWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760),
           child: ListView(
-            padding: const .fromLTRB(16, 12, 16, 28),
+            padding: const .fromLTRB(16, 10, 16, 24),
             children: [
               _sectionHeader(theme, Icons.palette_outlined, 'Appearance'),
               Card(
-                child: _segmentedRow<ThemeMode>(
-                  theme, Icons.palette_outlined, 'Theme', 'Dark, light, or system', settings.themeMode,
-                  settingsNotifier.setThemeMode,
-                  const [
-                    ButtonSegment(value: .dark, label: Text('Dark')),
-                    ButtonSegment(value: .light, label: Text('Light')),
-                    ButtonSegment(value: .system, label: Text('System')),
-                  ],
-                ),
+                child: _dividedColumn([
+                  _segmentedRow<ThemeMode>(
+                    theme, Icons.palette_outlined, 'Theme', 'Dark, light, or system', settings.themeMode,
+                    settingsNotifier.setThemeMode,
+                    const [
+                      ButtonSegment(value: .dark, label: Text('Dark')),
+                      ButtonSegment(value: .light, label: Text('Light')),
+                      ButtonSegment(value: .system, label: Text('System')),
+                    ],
+                  ),
+                  _labeledControlRow(
+                    theme, Icons.dashboard_customize_outlined, 'Workspace Mode',
+                    settings.workspaceMode == .simple
+                        ? 'Simple webcam • 1-click PC setup'
+                        : 'Studio • multi-cam, OBS & stats',
+                    const Row(mainAxisSize: .min, children: [WorkspaceModePill()]),
+                  ),
+                ]),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               _sectionHeader(theme, Icons.high_quality_rounded, 'Video & Audio'),
               Card(
                 child: _dividedColumn([
@@ -67,13 +77,13 @@ class const SettingsScreen({super.key}) extends ConsumerWidget {
                       'Pause sender preview while streaming to stay cool', settings.ecoDimPreview, settingsNotifier.setEcoDimPreview),
                 ]),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               _sectionHeader(theme, Icons.camera_enhance_outlined, 'Streamer Presets'),
               const RigPresetSettingsCard(),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               _sectionHeader(theme, Icons.keyboard_alt_outlined, 'Keyboard Shortcuts'),
               const ShortcutSettingsCard(),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               Card(
                 clipBehavior: .antiAlias,
                 child: Theme(
@@ -111,10 +121,10 @@ class const SettingsScreen({super.key}) extends ConsumerWidget {
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: () => HowToUseSheet.show(context)),
                   _tile(primary, Icons.cast_connected_rounded, 'Phone2Screen',
-                      subtitle: 'Version 0.2.0 • Streamer Webcam Studio'),
+                      subtitle: 'Version 0.4.0 • Streamer Webcam Studio'),
                   _tile(primary, Icons.description_outlined, 'Open-Source Licenses',
                       trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => showLicensePage(context: context, applicationName: 'Phone2Screen', applicationVersion: '0.2.0')),
+                      onTap: () => showLicensePage(context: context, applicationName: 'Phone2Screen', applicationVersion: '0.4.0')),
                 ]),
               ),
             ],
@@ -228,6 +238,26 @@ class const SettingsScreen({super.key}) extends ConsumerWidget {
     T selected,
     ValueChanged<T> onChanged,
     List<ButtonSegment<T>> segments,
+  ) => _labeledControlRow(
+    theme,
+    icon,
+    title,
+    subtitle,
+    SegmentedButton<T>(
+      showSelectedIcon: false,
+      style: const ButtonStyle(visualDensity: .compact, tapTargetSize: .shrinkWrap, padding: WidgetStatePropertyAll(.symmetric(horizontal: 10))),
+      segments: segments,
+      selected: {selected},
+      onSelectionChanged: (s) => onChanged(s.first),
+    ),
+  );
+
+  Widget _labeledControlRow(
+    ThemeData theme,
+    IconData icon,
+    String title,
+    String subtitle,
+    Widget control,
   ) {
     final colors = theme.colorScheme;
     final label = Row(
@@ -245,13 +275,6 @@ class const SettingsScreen({super.key}) extends ConsumerWidget {
           ),
         ),
       ],
-    );
-    final control = SegmentedButton<T>(
-      showSelectedIcon: false,
-      style: const ButtonStyle(visualDensity: .compact, tapTargetSize: .shrinkWrap, padding: WidgetStatePropertyAll(.symmetric(horizontal: 10))),
-      segments: segments,
-      selected: {selected},
-      onSelectionChanged: (s) => onChanged(s.first),
     );
     return Padding(
       padding: const .symmetric(horizontal: 16, vertical: 12),

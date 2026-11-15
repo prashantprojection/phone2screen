@@ -12,7 +12,8 @@ enum ShortcutAction {
   openClipboard,
   openGuide,
   openCameraRig,
-  disconnectStream;
+  disconnectStream,
+  toggleVideoPause;
 
   /// Human-readable short title shown in settings and shortcut badges.
   String get label => switch (this) {
@@ -27,6 +28,7 @@ enum ShortcutAction {
     .openGuide => 'How to Use',
     .openCameraRig => 'Camera Rig & Color',
     .disconnectStream => 'Stop / Disconnect',
+    .toggleVideoPause => 'Pause Camera',
   };
 
   /// Concise description of what triggering this shortcut does.
@@ -42,6 +44,7 @@ enum ShortcutAction {
     .openGuide => 'Open the quick-start guide',
     .openCameraRig => 'Open remote phone camera and studio color controls',
     .disconnectStream => 'End the active stream session',
+    .toggleVideoPause => 'Freeze or resume camera feed with privacy slate',
   };
 }
 
@@ -146,6 +149,7 @@ const Map<ShortcutAction, ShortcutBinding> defaultShortcutBindings = {
   .openGuide: ShortcutBinding(keyId: 0x00000067, keyLabel: 'G'),
   .openCameraRig: ShortcutBinding(keyId: 0x00000076, keyLabel: 'V'),
   .disconnectStream: ShortcutBinding(keyId: 0x00000078, keyLabel: 'X'),
+  .toggleVideoPause: ShortcutBinding(keyId: 0x00000070, keyLabel: 'P'),
 };
 
 /// Global keyboard shortcut preferences and action lookup configuration.

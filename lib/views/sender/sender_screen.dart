@@ -125,11 +125,13 @@ class _SenderScreenState extends ConsumerState<SenderScreen> {
             AppColors.accentOrange,
             session.phase == .reconnecting ? 'Reconnecting' : 'Connecting',
           )
-        : switch (session.liveTally.state) {
-            .preview => (AppColors.accentGreen, 'Preview'),
-            .standby => (AppColors.cyanAccent, 'Standby'),
-            .program || .off => (AppColors.accentRed, 'ON AIR'),
-          };
+        : (session.isVideoPaused
+              ? (AppColors.accentOrange, 'PAUSED')
+              : switch (session.liveTally.state) {
+                  .preview => (AppColors.accentGreen, 'Preview'),
+                  .standby => (AppColors.cyanAccent, 'Standby'),
+                  .program || .off => (AppColors.accentRed, 'ON AIR'),
+                });
     final statusLabel = '$statusPrefix • $peerName';
 
     return ColoredBox(
@@ -150,6 +152,7 @@ class _SenderScreenState extends ConsumerState<SenderScreen> {
                   )
                 : VideoStageWidget(
                     stream: session.localStream,
+                    isPaused: session.isVideoPaused,
                     borderRadius: 0,
                     waitingLabel: session.phase == .connecting ? 'Connecting to $peerName...' : 'Preparing stream...',
                   ),

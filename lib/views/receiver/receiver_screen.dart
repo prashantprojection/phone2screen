@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -11,11 +13,14 @@ import '../../../providers/platform_provider.dart';
 import '../../../providers/preferences_provider.dart';
 import '../../../providers/session_provider.dart';
 import '../../../providers/settings_provider.dart';
+import '../../../providers/virtual_cam_provider.dart';
 import '../shared/error_banner.dart';
+import '../shared/workspace_mode_pill.dart';
 import 'widgets/network_details_card.dart';
 import 'widgets/obs_virtual_cam_sheet.dart';
 import 'widgets/qr_pairing_card.dart';
 import 'widgets/receiver_streaming_stage.dart';
+import 'widgets/simple_webcam_card.dart';
 
 /// Receiver landing lobby and live WebRTC video viewing screen.
 class const ReceiverScreen({super.key}) extends ConsumerStatefulWidget {
@@ -43,9 +48,24 @@ class _ReceiverScreenState extends ConsumerState<ReceiverScreen> {
       );
     }
 
+    ref.listen<bool>(
+      sessionProvider.select((s) => s.phase == .streaming),
+      (wasStreaming, isStreaming) {
+        if (wasStreaming == true && !isStreaming) {
+          unawaited(
+            ref.read(nativeVirtualCamProvider.notifier).syncStreamState(
+              isStreaming: false,
+              isPaused: false,
+            ),
+          );
+        }
+      },
+    );
+
     final session = ref.watch(sessionProvider);
     final display = ref.watch(viewerDisplayProvider);
     final multiCam = ref.watch(multiCamProvider);
+    final workspaceMode = ref.watch(appSettingsProvider.select((s) => s.workspaceMode));
     final hasActiveStage = session.phase == .streaming ||
         session.phase == .connecting ||
         session.phase == .reconnecting ||
@@ -62,6 +82,7 @@ class _ReceiverScreenState extends ConsumerState<ReceiverScreen> {
     final endpoint = session.activeEndpoint;
     final launchArgs = ref.watch(windowLaunchArgsProvider);
     final isDesktop = !platform.isWeb && platform.isDesktop;
+    final showSimpleWebcam = isDesktop && !launchArgs.isSecondaryCameraWindow;
     final heading = endpoint != null ? 'Ready on ${endpoint.deviceName}' : 'Ready to Receive';
     final subtitle = endpoint != null || session.phase == .hosting
         ? 'Open Phone2Screen on your phone and tap this screen — or scan the QR code.'
@@ -90,7 +111,9 @@ class _ReceiverScreenState extends ConsumerState<ReceiverScreen> {
                 isDesktop: isDesktop,
                 launchArgs: launchArgs,
                 multiCam: multiCam,
+                workspaceMode: workspaceMode,
               ),
+              if (showSimpleWebcam) const SimpleWebcamCard(),
               LayoutBuilder(
                 builder: (context, constraints) {
                   final wide = context.isExpanded || constraints.maxWidth >= 860;
@@ -128,6 +151,7 @@ class const _LobbyHeader({
   required final bool isDesktop,
   required final WindowLaunchArgs launchArgs,
   required final MultiCamState multiCam,
+  required final WorkspaceMode workspaceMode,
 }) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -137,6 +161,7 @@ class const _LobbyHeader({
     final canOpen = multiCam.childWindows.length < StreamConstants.maxDesktopReceiverPeers - 1;
     final showSecondaryChip = isDesktop && launchArgs.isSecondaryCameraWindow;
     final showAction = isDesktop && !launchArgs.isSecondaryCameraWindow;
+    final showStudioActions = showAction && workspaceMode == .studio;
     final hasChips = showSecondaryChip || (isDesktop && multiCam.childWindows.isNotEmpty);
 
     return Column(
@@ -159,18 +184,21 @@ class const _LobbyHeader({
               runSpacing: 8,
               crossAxisAlignment: .center,
               children: [
-                OutlinedButton.icon(
-                  onPressed: () => ObsVirtualCamSheet.show(context),
-                  style: OutlinedButton.styleFrom(visualDensity: .compact, shape: const StadiumBorder(), padding: const .symmetric(horizontal: 14, vertical: 10)),
-                  icon: const Icon(Icons.videocam_rounded, size: 17),
-                  label: const Text('Virtual Cam & OBS'),
-                ),
-                FilledButton.tonalIcon(
-                  onPressed: canOpen ? () => notifier.openCameraWindow() : null,
-                  style: FilledButton.styleFrom(visualDensity: .compact, shape: const StadiumBorder(), padding: const .symmetric(horizontal: 14, vertical: 10)),
-                  icon: Icon(Icons.open_in_new_rounded, size: 17, color: colors.primary),
-                  label: const Text('+ Open Camera Window'),
-                ),
+                const WorkspaceModePill(compact: true),
+                if (showStudioActions) ...[
+                  OutlinedButton.icon(
+                    onPressed: () => ObsVirtualCamSheet.show(context),
+                    style: OutlinedButton.styleFrom(visualDensity: .compact, shape: const StadiumBorder(), padding: const .symmetric(horizontal: 14, vertical: 10)),
+                    icon: const Icon(Icons.videocam_rounded, size: 17),
+                    label: const Text('Virtual Cam & OBS'),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: canOpen ? () => notifier.openCameraWindow() : null,
+                    style: FilledButton.styleFrom(visualDensity: .compact, shape: const StadiumBorder(), padding: const .symmetric(horizontal: 14, vertical: 10)),
+                    icon: Icon(Icons.open_in_new_rounded, size: 17, color: colors.primary),
+                    label: const Text('+ Open Camera Window'),
+                  ),
+                ],
               ],
             );
             if (constraints.maxWidth >= 820) {

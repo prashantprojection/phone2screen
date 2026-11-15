@@ -77,12 +77,23 @@ class const HowToUseSheet({super.key}) extends StatelessWidget {
                     style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
                   ),
                   const _ScenarioCard(
+                    icon: Icons.videocam_outlined,
+                    accent: AppColors.primaryLight,
+                    title: 'Use Phone as PC Webcam (No OBS)',
+                    subtitle: 'Simple Mode — DirectShow webcam for Zoom, Google Meet, Teams & Discord.',
+                    steps: [
+                      'Stay in Simple mode on PC Receive and click Enable Windows Webcam (no admin required).',
+                      'Connect your phone over Wi-Fi or USB, then select "Phone2Screen Camera" inside your call app.',
+                      'Press P (or tap Pause) anytime to freeze video with a privacy slate.',
+                    ],
+                  ),
+                  const _ScenarioCard(
                     icon: Icons.devices_rounded,
                     accent: AppColors.primaryBlue,
                     title: 'Phone to PC',
-                    subtitle: 'Stream between Phone2Screen apps — ideal for OBS Window Capture & multi-cam.',
+                    subtitle: 'Switch to Studio mode for OBS Window Capture, tally & multi-cam.',
                     steps: [
-                      'Open Receive mode on PC (click + Open Camera Window for extra phones).',
+                      'Open Receive mode on PC (switch to Studio to click + Open Camera Window for extra phones).',
                       'Open Send mode on your phone, pick a Rig Preset, and tap Connect or Scan QR Code.',
                       'Press F for Fullscreen and tap (or press O) to hide controls for clean OBS Window Capture.',
                     ],
@@ -212,12 +223,12 @@ class const _QuickTipsCard() extends StatelessWidget {
         'USB Zero-Lag: Enable phone USB Tethering (PC prioritizes USB NIC automatically) or run adb reverse tcp:8080 tcp:8080 and tap USB / ADB with the USB Ultra 20 Mbps preset.',
       ),
       (
-        Icons.live_tv_rounded,
-        'OBS Studio & Multi-Cam: Use /obs in Browser Source, press F then O to hide controls for clean capture, or click + Open Camera Window on desktop to run up to 4 phones side-by-side.',
+        Icons.videocam_off_rounded,
+        'Privacy Pause (P): Press P or tap Pause anytime on Receiver or Sender to freeze video on a dark privacy slate (including Phone2Screen Camera).',
       ),
       (
-        Icons.wifi_tethering_rounded,
-        'No Wi-Fi? Turn on your phone hotspot and connect your PC — works offline with zero mobile data.',
+        Icons.live_tv_rounded,
+        'Simple vs Studio Mode: Use Simple for 1-click Windows Webcam (Zoom/Meet/Teams/Discord), or switch to Studio for /obs, OBS WebSocket tally & up to 4 phones.',
       ),
       (
         Icons.fullscreen_rounded,

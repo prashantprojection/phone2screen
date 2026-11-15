@@ -6,12 +6,14 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../models/camera_control_state.dart';
 import '../../../models/stream_telemetry.dart';
 import '../../../models/viewer_display_config.dart';
 import '../../../providers/multi_cam_provider.dart';
 import '../../../providers/session_provider.dart';
 import '../../../providers/settings_provider.dart';
 import '../../../providers/shortcut_provider.dart';
+import '../../../providers/virtual_cam_provider.dart';
 import '../../shared/clipboard_sync_sheet.dart';
 import '../../shared/video_stage_widget.dart';
 import 'remote_camera_panel.dart';
@@ -64,8 +66,21 @@ class _FullscreenStageViewState extends ConsumerState<FullscreenStageView> {
     );
     final activeTelemetry = slot?.telemetry ?? widget.session.telemetry;
     final peerName = slot?.deviceName ?? widget.session.connectedPeerName;
+    final effectivePaused = slot != null
+        ? (slot.displayConfig.isVideoPaused || slot.cameraState.videoPaused)
+        : (widget.display.isVideoPaused || widget.session.remoteCameraState.videoPaused);
+    final vcamNotifier = ref.watch(nativeVirtualCamProvider.notifier);
 
-    final stage = VideoStageWidget(stream: activeStream, displayConfig: activeDisplay, borderRadius: 0, waitingLabel: waitingLabel);
+    final videoWidget = VideoStageWidget(
+      stream: activeStream,
+      displayConfig: activeDisplay,
+      isPaused: effectivePaused,
+      borderRadius: 0,
+      waitingLabel: waitingLabel,
+    );
+    final stage = slot == null
+        ? RepaintBoundary(key: vcamNotifier.stageBoundaryKey, child: videoWidget)
+        : videoWidget;
     final compactCollision = context.isCompact && widget.display.fullscreenHudVisible && (widget.display.showTelemetry || peerName != null);
     return SizedBox.expand(
       child: ColoredBox(
@@ -199,6 +214,7 @@ class const _FullscreenHudPill({required final ViewerDisplayConfig display, requ
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.read(viewerDisplayProvider.notifier);
     final shortcuts = ref.watch(shortcutProvider);
+    final isPaused = display.isVideoPaused || ref.watch(sessionProvider.select((s) => s.remoteCameraState.videoPaused));
     return Material(
       type: .transparency,
       child: _frostedPill(
@@ -215,6 +231,11 @@ class const _FullscreenHudPill({required final ViewerDisplayConfig display, requ
               _hudBtn(display.coverFit ? Icons.fit_screen_rounded : Icons.aspect_ratio_rounded, shortcuts.tooltipFor(display.coverFit ? 'Fit Screen' : 'Fill Screen', .toggleFit), notifier.toggleFit, active: display.coverFit),
               _hudBtn(Icons.rotate_right_rounded, shortcuts.tooltipFor('Rotate 90°', .rotateVideo), notifier.rotate90, active: display.quarterTurns % 4 != 0),
               _hudBtn(Icons.flip_rounded, shortcuts.tooltipFor('Mirror', .toggleMirror), notifier.toggleMirror, active: display.mirrored),
+              _hudBtn(isPaused ? Icons.videocam_off_rounded : Icons.pause_circle_outline_rounded, shortcuts.tooltipFor(isPaused ? 'Resume Camera' : 'Pause Camera', .toggleVideoPause), () {
+                final next = !isPaused;
+                notifier.setVideoPaused(next);
+                ref.read(sessionProvider.notifier).sendRemoteCameraCommand(RemoteCameraCommand(command: .videoPause, enabled: next));
+              }, active: isPaused, accent: isPaused ? AppColors.accentOrange : null),
               _hudBtn(Icons.tune_rounded, shortcuts.tooltipFor('Camera Rig & Color', .openCameraRig), () => RemoteCameraPanel.show(context), active: display.hasColorAdjustments || display.hasFramingAdjustments),
               _hudBtn(display.audioMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded, shortcuts.tooltipFor(display.audioMuted ? 'Unmute' : 'Mute', .toggleMute), notifier.toggleMute, accent: display.audioMuted ? AppColors.accentOrange : null),
               _hudBtn(Icons.content_paste_go_rounded, shortcuts.tooltipFor('Share Text', .openClipboard), () => ClipboardSyncSheet.show(context)),

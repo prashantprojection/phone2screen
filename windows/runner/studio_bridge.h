@@ -27,6 +27,11 @@ class StudioBridge {
   flutter::EncodableValue ListAudioOutputDevices() const;
   bool SetAlwaysOnTop(bool enabled) const;
   bool GetAlwaysOnTop() const;
+  flutter::EncodableValue GetVirtualCamStatus() const;
+  bool RegisterVirtualCam() const;
+  bool UnregisterVirtualCam() const;
+  bool SetVirtualCamState(int state) const;
+  bool PushVirtualCamFrame(const flutter::EncodableMap& args) const;
 
   HWND hwnd_ = nullptr;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel_;

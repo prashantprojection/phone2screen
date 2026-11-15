@@ -7,6 +7,7 @@ import '../../../core/constants/stream_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../providers/obs_sync_provider.dart';
+import 'native_vcam_section.dart';
 import 'studio_look_audio_section.dart';
 
 /// Studio inspector drawer/sheet for Virtual Camera, Always-On-Top, and OBS WebSocket v5 sync.
@@ -147,6 +148,7 @@ class _ObsVirtualCamSheetState extends ConsumerState<ObsVirtualCamSheet> {
                   crossAxisAlignment: .stretch,
                   spacing: 12,
                   children: [
+                    const NativeVirtualCamSection(),
                     _buildVirtualCamCard(theme, colors, camsAsync, obsSync, obsNotifier, alwaysOnTop, windowsSupported),
                     _buildObsTallyCard(theme, colors, obsSync, obsNotifier),
                   ],

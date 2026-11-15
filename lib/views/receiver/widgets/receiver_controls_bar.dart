@@ -6,12 +6,14 @@ import 'package:material_ui/material_ui.dart';
 import '../../../core/constants/stream_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../models/camera_control_state.dart';
 import '../../../providers/multi_cam_provider.dart';
 import '../../../providers/obs_sync_provider.dart';
 import '../../../providers/platform_provider.dart';
 import '../../../providers/session_provider.dart';
 import '../../../providers/settings_provider.dart';
 import '../../../providers/shortcut_provider.dart';
+import '../../../providers/virtual_cam_provider.dart';
 import '../../shared/clipboard_sync_sheet.dart';
 import 'obs_virtual_cam_sheet.dart';
 import 'remote_camera_panel.dart';
@@ -26,17 +28,24 @@ class const ReceiverControlsBar({super.key}) extends ConsumerWidget {
     final platform = ref.watch(platformServiceProvider);
     final session = ref.watch(sessionProvider);
     final multiCam = ref.watch(multiCamProvider);
+    final isStudio = ref.watch(appSettingsProvider.select((s) => s.workspaceMode)) == .studio;
     final compact = context.isCompact;
     final isDesktop = !platform.isWeb && platform.isDesktop;
     final obsSync = isDesktop ? ref.watch(obsSyncProvider) : const ObsSyncState();
+    final nativeVcam = isDesktop ? ref.watch(nativeVirtualCamProvider) : const NativeVirtualCamStatus();
+    final isPaused = display.isVideoPaused || session.remoteCameraState.videoPaused;
 
     final fitLabel = display.coverFit ? 'Fill' : 'Fit';
+    final pauseLabel = isPaused ? 'Resume' : 'Pause';
     final audioLabel = display.audioMuted ? 'Muted' : 'Audio';
     final fsLabel = display.isFullscreen ? 'Windowed' : 'Fullscreen';
     final rigActive =
         display.hasColorAdjustments || display.hasFramingAdjustments || display.showGrid;
     final canOpenWindow =
         multiCam.childWindows.length < StreamConstants.maxDesktopReceiverPeers - 1;
+    final vcamAccent = obsSync.virtualCamActive
+        ? AppColors.accentRed
+        : ((obsSync.connected || nativeVcam.isRegistered) ? AppColors.accentGreen : null);
 
     return Center(
       child: ConstrainedBox(
@@ -88,11 +97,26 @@ class const ReceiverControlsBar({super.key}) extends ConsumerWidget {
                         onPressed: notifier.toggleMirror,
                       ),
                       _DockButton(
-                        icon: Icons.speed_rounded,
-                        tooltip: shortcuts.tooltipFor('Live Stats', .toggleStats),
-                        active: display.showTelemetry,
-                        onPressed: notifier.toggleTelemetry,
+                        icon: isPaused ? Icons.videocam_off_rounded : Icons.pause_circle_outline_rounded,
+                        label: compact ? null : pauseLabel,
+                        tooltip: shortcuts.tooltipFor(isPaused ? 'Resume Camera' : 'Pause Camera', .toggleVideoPause),
+                        active: isPaused,
+                        accentColor: isPaused ? AppColors.accentOrange : null,
+                        onPressed: () {
+                          final nextPaused = !isPaused;
+                          notifier.setVideoPaused(nextPaused);
+                          ref.read(sessionProvider.notifier).sendRemoteCameraCommand(
+                            RemoteCameraCommand(command: .videoPause, enabled: nextPaused),
+                          );
+                        },
                       ),
+                      if (isStudio)
+                        _DockButton(
+                          icon: Icons.speed_rounded,
+                          tooltip: shortcuts.tooltipFor('Live Stats', .toggleStats),
+                          active: display.showTelemetry,
+                          onPressed: notifier.toggleTelemetry,
+                        ),
                       if (!compact) _divider(),
                       _DockButton(
                         icon: Icons.tune_rounded,
@@ -107,18 +131,17 @@ class const ReceiverControlsBar({super.key}) extends ConsumerWidget {
                           icon: Icons.videocam_rounded,
                           label: compact ? null : 'Virtual Cam',
                           tooltip: 'Virtual Cam & OBS Sync',
-                          active: obsSync.connected || obsSync.virtualCamActive,
-                          accentColor: obsSync.virtualCamActive
-                              ? AppColors.accentRed
-                              : (obsSync.connected ? AppColors.accentGreen : null),
+                          active: obsSync.connected || obsSync.virtualCamActive || nativeVcam.isRegistered,
+                          accentColor: vcamAccent,
                           onPressed: () => ObsVirtualCamSheet.show(context),
                         ),
-                        _DockButton(
-                          icon: Icons.open_in_new_rounded,
-                          label: compact ? null : '+ Window',
-                          tooltip: canOpenWindow ? 'Open secondary camera window' : 'Max camera windows open',
-                          onPressed: () => _openWindow(context, ref),
-                        ),
+                        if (isStudio)
+                          _DockButton(
+                            icon: Icons.open_in_new_rounded,
+                            label: compact ? null : '+ Window',
+                            tooltip: canOpenWindow ? 'Open secondary camera window' : 'Max camera windows open',
+                            onPressed: () => _openWindow(context, ref),
+                          ),
                       ],
                       if (!compact) _divider(),
                       _DockButton(
@@ -128,11 +151,12 @@ class const ReceiverControlsBar({super.key}) extends ConsumerWidget {
                         accentColor: display.audioMuted ? AppColors.accentOrange : null,
                         onPressed: notifier.toggleMute,
                       ),
-                      _DockButton(
-                        icon: Icons.content_paste_go_rounded,
-                        tooltip: shortcuts.tooltipFor('Share Text', .openClipboard),
-                        onPressed: () => ClipboardSyncSheet.show(context),
-                      ),
+                      if (isStudio)
+                        _DockButton(
+                          icon: Icons.content_paste_go_rounded,
+                          tooltip: shortcuts.tooltipFor('Share Text', .openClipboard),
+                          onPressed: () => ClipboardSyncSheet.show(context),
+                        ),
                       _DockButton(
                         icon: display.isFullscreen ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
                         label: compact ? null : fsLabel,

@@ -3,10 +3,12 @@
 #include <flutter/standard_method_codec.h>
 
 #include <cctype>
+#include <cstdint>
 #include <cstring>
 #include <initializer_list>
 #include <string>
 #include <utility>
+#include <vector>
 
 #pragma warning(push, 3)
 #include <dshow.h>
@@ -14,6 +16,9 @@
 #include <objbase.h>
 #include <oleauto.h>
 #pragma warning(pop)
+
+#include "vcam_registry.h"
+#include "vcam_shared_mem.h"
 
 namespace {
 
@@ -43,7 +48,8 @@ bool ContainsAnyToken(const std::string& text,
 
 bool IsVirtualCamName(const std::string& name) {
   return ContainsAnyToken(name, {"obs", "virtual", "unitycapture", "droidcam",
-                                 "iriun", "camo", "ndi", "elgato", "xsplit"});
+                                 "iriun", "camo", "ndi", "elgato", "xsplit",
+                                 "phone2screen"});
 }
 
 bool IsVirtualCableName(const std::string& name) {
@@ -79,6 +85,28 @@ bool TryExtractEnabledArg(const flutter::EncodableValue* args, bool* out) {
     }
   }
   return false;
+}
+
+bool TryExtractMapInt(const flutter::EncodableMap& map, const char* key,
+                      int* out) {
+  const auto it = map.find(flutter::EncodableValue(key));
+  if (it == map.end()) return false;
+  if (const auto* v32 = std::get_if<int32_t>(&it->second)) {
+    *out = *v32;
+    return true;
+  }
+  if (const auto* v64 = std::get_if<int64_t>(&it->second)) {
+    *out = static_cast<int>(*v64);
+    return true;
+  }
+  return false;
+}
+
+bool FileExistsW(const std::wstring& path) {
+  if (path.empty()) return false;
+  const DWORD attrs = ::GetFileAttributesW(path.c_str());
+  return attrs != INVALID_FILE_ATTRIBUTES &&
+         (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0;
 }
 
 }  // namespace
@@ -125,9 +153,34 @@ void StudioBridge::HandleMethodCall(
   }
   if (method == "getAlwaysOnTop") {
     result->Success(flutter::EncodableValue(GetAlwaysOnTop()));
-    return;
+  } else if (method == "getVirtualCamStatus") {
+    result->Success(GetVirtualCamStatus());
+  } else if (method == "registerVirtualCam") {
+    result->Success(flutter::EncodableValue(RegisterVirtualCam()));
+  } else if (method == "unregisterVirtualCam") {
+    result->Success(flutter::EncodableValue(UnregisterVirtualCam()));
+  } else if (method == "setVirtualCamState") {
+    int state = 0;
+    const auto* map = call.arguments()
+                          ? std::get_if<flutter::EncodableMap>(call.arguments())
+                          : nullptr;
+    if (map == nullptr || !TryExtractMapInt(*map, "state", &state)) {
+      result->Error("INVALID_ARGS", "Expected {state: int}");
+      return;
+    }
+    result->Success(flutter::EncodableValue(SetVirtualCamState(state)));
+  } else if (method == "pushVirtualCamFrame") {
+    const auto* map = call.arguments()
+                          ? std::get_if<flutter::EncodableMap>(call.arguments())
+                          : nullptr;
+    if (map == nullptr) {
+      result->Error("INVALID_ARGS", "Expected {bytes, width, height}");
+      return;
+    }
+    result->Success(flutter::EncodableValue(PushVirtualCamFrame(*map)));
+  } else {
+    result->NotImplemented();
   }
-  result->NotImplemented();
 }
 
 flutter::EncodableValue StudioBridge::ListVideoCaptureDevices() const {
@@ -214,4 +267,53 @@ bool StudioBridge::SetAlwaysOnTop(bool enabled) const {
 bool StudioBridge::GetAlwaysOnTop() const {
   if (hwnd_ == nullptr || !::IsWindow(hwnd_)) return false;
   return (::GetWindowLongPtr(hwnd_, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0;
+}
+
+flutter::EncodableValue StudioBridge::GetVirtualCamStatus() const {
+  const std::wstring dll_path = p2s_vcam::ResolveVCamDllPath(nullptr);
+  using V = flutter::EncodableValue;
+  flutter::EncodableMap map{
+      {V("registered"), V(p2s_vcam::IsVirtualCamRegisteredHkcu())},
+      {V("dllFound"), V(FileExistsW(dll_path))},
+      {V("dllPath"), V(WideToUtf8(dll_path.c_str()))},
+      {V("state"), V(static_cast<int32_t>(p2s_vcam::ReadVirtualCamSharedState()))},
+      {V("deviceName"), V("Phone2Screen Camera")},
+  };
+  return V(std::move(map));
+}
+
+bool StudioBridge::RegisterVirtualCam() const {
+  const std::wstring dll_path = p2s_vcam::ResolveVCamDllPath(nullptr);
+  if (!FileExistsW(dll_path)) return false;
+  if (!p2s_vcam::RegisterVirtualCamHkcu(dll_path.c_str())) return false;
+  p2s_vcam::SetVirtualCamSharedState(p2s_vcam::kVCamStateStandby);
+  return true;
+}
+
+bool StudioBridge::UnregisterVirtualCam() const {
+  p2s_vcam::SetVirtualCamSharedState(p2s_vcam::kVCamStateStandby);
+  return p2s_vcam::UnregisterVirtualCamHkcu();
+}
+
+bool StudioBridge::SetVirtualCamState(int state) const {
+  if (state < 0 || state > 2) return false;
+  return p2s_vcam::SetVirtualCamSharedState(static_cast<uint32_t>(state));
+}
+
+bool StudioBridge::PushVirtualCamFrame(
+    const flutter::EncodableMap& args) const {
+  int width = 0, height = 0;
+  if (!TryExtractMapInt(args, "width", &width) ||
+      !TryExtractMapInt(args, "height", &height) ||
+      width <= 0 || height <= 0 || width > 8192 || height > 8192) {
+    return false;
+  }
+  const auto it = args.find(flutter::EncodableValue("bytes"));
+  if (it == args.end()) return false;
+  const auto* bytes = std::get_if<std::vector<uint8_t>>(&it->second);
+  if (bytes == nullptr) return false;
+  const size_t expected =
+      static_cast<size_t>(width) * static_cast<size_t>(height) * 4u;
+  if (bytes->size() < expected) return false;
+  return p2s_vcam::PushVirtualCamRgbaFrame(bytes->data(), width, height);
 }

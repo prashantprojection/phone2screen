@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
@@ -14,6 +15,7 @@ class const VideoStageWidget({
   super.key,
   required final MediaStream? stream,
   final ViewerDisplayConfig displayConfig = const ViewerDisplayConfig(),
+  final bool isPaused = false,
   final String waitingLabel = 'Waiting for video stream...',
   final double borderRadius = 16.0,
 }) extends StatefulWidget {
@@ -96,15 +98,37 @@ class _VideoStageWidgetState extends State<VideoStageWidget> {
   Widget build(BuildContext context) {
     final stream = widget.stream;
     final config = widget.displayConfig;
+    final paused = widget.isPaused || config.isVideoPaused;
     return ClipRRect(
       borderRadius: .circular(widget.borderRadius),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: config.isFullscreen ? Colors.black : const Color(0xFF07080A),
         ),
-        child: stream == null || !_initialized
-            ? _WaitingPlaceholder(label: widget.waitingLabel)
-            : _buildGradedStage(config),
+        child: Stack(
+          fit: .expand,
+          children: [
+            stream == null || !_initialized
+                ? _StageSlate(
+                    icon: Icons.cast_connected_rounded,
+                    iconColor: AppColors.primaryLight,
+                    badgeFill: AppColors.primaryBlue.withValues(alpha: 0.12),
+                    badgeBorder: AppColors.primaryLight.withValues(alpha: 0.28),
+                    title: widget.waitingLabel,
+                  )
+                : _buildGradedStage(config),
+            if (paused && stream != null)
+              _StageSlate(
+                icon: Icons.videocam_off_rounded,
+                iconColor: AppColors.accentOrange,
+                badgeFill: AppColors.accentOrange.withValues(alpha: 0.16),
+                badgeBorder: AppColors.accentOrange.withValues(alpha: 0.48),
+                title: 'Camera Paused',
+                subtitle: 'Privacy Mode • Press P or Resume to go live',
+                frosted: true,
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -192,11 +216,19 @@ class _VideoStageWidgetState extends State<VideoStageWidget> {
   }
 }
 
-class const _WaitingPlaceholder({required final String label})
-    extends StatelessWidget {
+class const _StageSlate({
+  required final IconData icon,
+  required final Color iconColor,
+  required final Color badgeFill,
+  required final Color badgeBorder,
+  required final String title,
+  final String? subtitle,
+  final bool frosted = false,
+}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
+    final textTheme = Theme.of(context).textTheme;
+    final body = LayoutBuilder(
       builder: (context, constraints) {
         final tight = constraints.maxHeight < 165 || constraints.maxWidth < 180;
         final boxSize = tight ? 48.0 : 70.0;
@@ -205,44 +237,49 @@ class const _WaitingPlaceholder({required final String label})
             padding: .all(tight ? 12 : 24),
             child: Column(
               mainAxisSize: .min,
-              spacing: tight ? 8 : 14,
+              spacing: tight ? 8 : 12,
               children: [
                 Container(
                   width: boxSize,
                   height: boxSize,
                   decoration: BoxDecoration(
                     shape: .circle,
-                    color: AppColors.primaryBlue.withValues(alpha: 0.12),
-                    border: Border.all(
-                      color: AppColors.primaryLight.withValues(alpha: 0.28),
-                      width: 1.5,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primaryBlue.withValues(alpha: 0.14),
-                        blurRadius: 24,
-                      ),
-                    ],
+                    color: badgeFill,
+                    border: Border.all(color: badgeBorder, width: 1.5),
                   ),
-                  child: Icon(
-                    Icons.cast_connected_rounded,
-                    size: tight ? 22 : 30,
-                    color: AppColors.primaryLight,
-                  ),
+                  child: Icon(icon, size: tight ? 22 : 30, color: iconColor),
                 ),
                 Text(
-                  label,
+                  title,
                   textAlign: .center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondaryDark,
-                    fontWeight: .w500,
-                  ),
+                  style: (frosted ? textTheme.titleMedium : textTheme.bodyMedium)
+                      ?.copyWith(
+                        color: frosted
+                            ? AppColors.textPrimaryDark
+                            : AppColors.textSecondaryDark,
+                        fontWeight: frosted ? .w700 : .w500,
+                      ),
                 ),
+                if (subtitle != null)
+                  Text(
+                    subtitle!,
+                    textAlign: .center,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondaryDark,
+                      fontSize: tight ? 11 : null,
+                      fontWeight: .w500,
+                    ),
+                  ),
               ],
             ),
           ),
         );
       },
+    );
+    if (!frosted) return body;
+    return BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+      child: ColoredBox(color: const Color(0xEB0B0E14), child: body),
     );
   }
 }
@@ -268,3 +305,5 @@ class _ThirdsGridPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _ThirdsGridPainter oldDelegate) => false;
 }
+
+// Shared _StageSlate handles both waiting and privacy-paused slates below.

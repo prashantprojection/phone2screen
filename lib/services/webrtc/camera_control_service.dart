@@ -122,6 +122,15 @@ class CameraControlService {
           // Best-effort DSP toggle; unsupported tracks keep desired mode flag.
         }
         return current.copyWith(voiceClean: clean);
+      case .videoPause:
+        final paused = cmd.enabled ?? !current.videoPaused;
+        final tracks = stream?.getVideoTracks();
+        if (tracks != null) {
+          for (final videoTrack in tracks) {
+            videoTrack.enabled = !paused;
+          }
+        }
+        return current.copyWith(videoPaused: paused);
     }
   }
 }

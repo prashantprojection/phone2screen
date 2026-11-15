@@ -95,6 +95,7 @@ class const ViewerDisplayConfig({
   final bool vignette = false,
   final double audioGain = 1.0,
   final int audioDelayMs = 0,
+  final bool isVideoPaused = false,
 }) {
   bool get hasColorAdjustments =>
       brightness != 0.0 ||
@@ -179,6 +180,7 @@ class const ViewerDisplayConfig({
     bool? vignette,
     double? audioGain,
     int? audioDelayMs,
+    bool? isVideoPaused,
   }) => ViewerDisplayConfig(
     coverFit: coverFit ?? this.coverFit,
     mirrored: mirrored ?? this.mirrored,
@@ -199,6 +201,7 @@ class const ViewerDisplayConfig({
     vignette: vignette ?? this.vignette,
     audioGain: audioGain ?? this.audioGain,
     audioDelayMs: audioDelayMs ?? this.audioDelayMs,
+    isVideoPaused: isVideoPaused ?? this.isVideoPaused,
   );
 
   @override
@@ -224,13 +227,14 @@ class const ViewerDisplayConfig({
           lookPreset == other.lookPreset &&
           vignette == other.vignette &&
           audioGain == other.audioGain &&
-          audioDelayMs == other.audioDelayMs;
+          audioDelayMs == other.audioDelayMs &&
+          isVideoPaused == other.isVideoPaused;
 
   @override
   int get hashCode => Object.hash(
     coverFit, mirrored, quarterTurns, audioMuted, isFullscreen,
     fullscreenHudVisible, showTelemetry, showGrid,
     aspectPreset, digitalZoom, panX, panY, brightness, contrast,
-    saturation, lookPreset, vignette, audioGain, audioDelayMs,
+    saturation, lookPreset, vignette, audioGain, audioDelayMs, isVideoPaused,
   );
 }

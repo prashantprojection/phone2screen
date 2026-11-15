@@ -1,9 +1,9 @@
 ---
 name: flutter-350-conventions
-description: Flutter 3.50 and Dart 3.14 coding standards for Phone2Screen v0.3 including package:material_ui, class const primary constructors, dot shorthands, manual Riverpod 3, DesktopWindowService multi-window spawning, WindowsStudioService & MSVC Win32 C++ constraints, manual JSON persistence, adaptive layout, and strict <350 LOC rules (.dart/.kt/.cpp/.h).
+description: Flutter 3.50 and Dart 3.14 coding standards for Phone2Screen v0.4 including package:material_ui, class const primary constructors, dot shorthands, manual Riverpod 3, DesktopWindowService multi-window spawning, WindowsStudioService & p2s_vcam.dll MSVC Win32 C++ constraints, WorkspaceMode Simple/Studio progressive disclosure, manual JSON persistence, adaptive layout, and strict <350 LOC rules (.dart/.kt/.cpp/.h).
 ---
 
-# Flutter 3.50 & Dart 3.14 Conventions (v0.3)
+# Flutter 3.50 & Dart 3.14 Conventions (v0.4)
 
 Follow these conventions for all Dart and Flutter code in Phone2Screen.
 
@@ -99,15 +99,20 @@ Follow these conventions for all Dart and Flutter code in Phone2Screen.
 - `PreferencesSnapshot` manually encodes/decodes `AppSettings`, `StreamConfig`, `ShortcutConfig`, custom `CameraRigPreset` lists, and `lastEndpoint` (`SignalingData`) with defensive `tryFromJson`/`fromJson` fallbacks.
 - Storage paths: Windows `%APPDATA%\Phone2Screen\preferences.json`, Android `MethodChannel('phone2screen/projection_service')` `getFilesDir` -> `phone2screen_prefs.json`, macOS/Linux config dirs, and in-memory isolation when `Platform.environment.containsKey('FLUTTER_TEST')` (unless `LocalPreferencesService.fromFilePath(...)` is passed explicitly under `.dart_tool/test_tmp_*`).
 
-## 7. Windows Native Bridge (`WindowsStudioService` & MSVC C++)
+## 7. Windows Native Bridge & Virtual Camera (`StudioBridge` & `p2s_vcam.dll`)
 
-- `WindowsStudioService` (`lib/services/windowing/windows_studio_service.dart`) wraps `MethodChannel('phone2screen/windows_studio')` backed by `StudioBridge` (`windows/runner/studio_bridge.cpp`/`.h`).
-- `windows/CMakeLists.txt` compiles C++ targets with MSVC `/W4 /WX` (warnings as errors) and `_HAS_EXCEPTIONS=0`:
+- `WindowsStudioService` (`lib/services/windowing/windows_studio_service.dart`) wraps `MethodChannel('phone2screen/windows_studio')` backed by `StudioBridge` (`windows/runner/studio_bridge.cpp`/`.h`), while `NativeVirtualCamNotifier` (`lib/providers/virtual_cam_provider.dart`) drives `p2s_vcam.dll` (`windows/runner/vcam_*`, shared memory `Local\Phone2ScreenVCamSharedV1`, HKCU per-user registration, 20 fps `stageBoundaryKey` `RepaintBoundary` capture).
+- `windows/CMakeLists.txt` compiles C++ targets (`phone2screen` & `p2s_vcam`) with MSVC `/W4 /WX` (warnings as errors) and `_HAS_EXCEPTIONS=0`:
   - **NEVER** use `try`, `catch`, `throw`, or `<comdef.h>` in `windows/runner/*.cpp`.
   - Wrap Win32 multimedia/DirectShow headers (`<dshow.h>`, `<mmsystem.h>`, `<objbase.h>`, `<oleauto.h>`) in `#pragma warning(push, 3)` ... `#pragma warning(pop)`, and avoid unused variables/parameters.
   - Link `ole32.lib`, `oleaut32.lib`, `strmiids.lib`, and `winmm.lib` in `windows/runner/CMakeLists.txt`.
 
-## 8. Responsive Design & File Size Limit
+## 8. Workspace Modes (`Simple` vs `Studio`) & Packaging
+
+- `AppSettings.workspaceMode` (`WorkspaceMode.simple` default / `WorkspaceMode.studio`) controls progressive disclosure via `WorkspaceModePill`, `SimpleWebcamCard` (Zero-OBS Windows Webcam), `NativeVirtualCamSection`, and `ReceiverControlsBar` (always keeping `Camera Rig` visible in both modes).
+- Windows release artifacts are staged via `scripts/package_windows.ps1` and `windows/packaging/phone2screen.iss` (non-admin x64 Inno Setup 6 installer + `scripts/setup_windows_webcam.ps1`).
+
+## 9. Responsive Design & File Size Limit
 
 - Use `lib/core/utils/responsive.dart`: `context.screenSize` (`compact` `< 640`, `medium` `640..1024`, `expanded` `> 1024`), `context.isCompact`, `context.isExpanded`, and `context.contentMaxWidth`.
 - Never import or use `flutter_screenutil`.

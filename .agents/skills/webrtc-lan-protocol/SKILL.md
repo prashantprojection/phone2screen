@@ -1,9 +1,9 @@
 ---
 name: webrtc-lan-protocol
-description: Specification for Phone2Screen v0.3 LAN & USB NIC ranking, ADB reverse + GET /p2s-info discovery, UDP 41234 P2S_V1 discovery, multi-peer /ws SignalingMessage JSON handshake, early ICE buffering, phone2screen-control DataChannel (ping/pong, clipboard, cam_ctrl/cam_state, tally), OBS WebSocket v5 sync, GET / Browser Web Companion, and GET /obs?delay=<ms> OBS Clean Feed.
+description: Specification for Phone2Screen v0.4 LAN & USB NIC ranking, ADB reverse + GET /p2s-info discovery, UDP 41234 P2S_V1 discovery, multi-peer /ws SignalingMessage JSON handshake, early ICE buffering, sub-second auto-reconnect, phone2screen-control DataChannel (ping/pong, clipboard, cam_ctrl/cam_state with videoPause, tally), OBS WebSocket v5 sync, GET / Browser Web Companion, and GET /obs?delay=<ms> OBS Clean Feed.
 ---
 
-# WebRTC, USB & LAN Signaling Protocol (v0.3)
+# WebRTC, USB & LAN Signaling Protocol (v0.4)
 
 Phone2Screen operates completely offline on a local network (USB tethering, ADB reverse loopback, Wi-Fi, Ethernet, or mobile hotspot) without cloud relay servers.
 
@@ -71,12 +71,12 @@ Phone2Screen operates completely offline on a local network (USB tethering, ADB 
     ```json
     {
       "kind": "cam_ctrl",
-      "cmd": "flip | torch | micMute | zoom | exposure | focusLock | voiceMode",
+      "cmd": "flip | torch | micMute | zoom | exposure | focusLock | voiceMode | videoPause",
       "value": 2.0,
       "enabled": true
     }
     ```
-    Parsed safely via `RemoteCameraCommand.tryFromJson`; executed via `CameraControlService.applyCommand`. `voiceMode` toggles live mic DSP (`echoCancellation`, `noiseSuppression`, `autoGainControl`).
+    Parsed safely via `RemoteCameraCommand.tryFromJson`; executed via `CameraControlService.applyCommand`. `voiceMode` toggles live mic DSP (`echoCancellation`, `noiseSuppression`, `autoGainControl`); `videoPause` freezes outgoing video tracks on the privacy slate.
   - `cam_state` (Sender -> Receiver, emitted on open and after changes):
     ```json
     {
@@ -90,10 +90,12 @@ Phone2Screen operates completely offline on a local network (USB tethering, ADB 
       "exposureOffset": 0.0,
       "focusLocked": false,
       "controlsSupported": true,
-      "voiceClean": true
+      "voiceClean": true,
+      "videoPaused": false
     }
     ```
     Parsed safely with finite/clamped bounds via `RemoteCameraState.tryFromJson`.
+  - **Sub-Second Auto-Reconnect (`SessionSenderFlow`)**: On unexpected WebSocket/peer drop during an active stream, transitions to `SessionPhase.reconnecting`, waits `650 ms`, probes USB loopback (`UsbBridgeService`) first, and retries once before falling back to `.failed`.
   - `tally` (Receiver -> Sender, emitted on control channel open, OBS scene/item updates, or multi-cam focus changes):
     ```json
     {

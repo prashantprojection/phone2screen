@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/camera_control_state.dart';
-import '../models/clipboard_item.dart';
 import '../models/device_role.dart';
 import '../models/media_source_type.dart';
 import '../models/obs_sync_state.dart';
@@ -13,6 +12,7 @@ import '../services/webrtc/media_capture_service.dart';
 import '../services/webrtc/webrtc_session_service.dart';
 import 'discovery_provider.dart';
 import 'platform_provider.dart';
+import 'session_camera_controls.dart';
 import 'session_host_flow.dart';
 import 'session_sender_flow.dart';
 import 'session_signaling_bridge.dart';
@@ -45,6 +45,7 @@ final sessionProvider = NotifierProvider<SessionNotifier, SessionState>(
 /// Coordinates LAN discovery, WebSocket signaling, media capture, and WebRTC.
 class SessionNotifier extends Notifier<SessionState> implements SessionContext {
   final SessionSignalingBridge _bridge = SessionSignalingBridge();
+  final SessionCameraControls _cameraControls = const SessionCameraControls();
   late final SessionSenderFlow _senderFlow = SessionSenderFlow(_bridge);
   late final SessionHostFlow _hostFlow = SessionHostFlow(_bridge, _senderFlow);
   late final SessionWebBroadcastFlow _webBroadcastFlow =
@@ -56,37 +57,42 @@ class SessionNotifier extends Notifier<SessionState> implements SessionContext {
 
   @override
   Ref get sessionRef => ref;
-
   @override
   SessionState get currentState => state;
 
   @override
-  set currentState(SessionState value) => state = value;
+  set currentState(SessionState value) {
+    final prev = state;
+    final nextPaused = value.remoteCameraState.videoPaused;
+    final syncPause = _isHosting && !value.isWebBroadcast &&
+        prev.remoteCameraState.videoPaused != nextPaused;
+    final leftLive = (prev.phase == .streaming || prev.phase == .connecting ||
+            prev.phase == .reconnecting) &&
+        (value.phase == .idle || value.phase == .hosting || value.phase == .failed);
+    state = syncPause ? value.copyWith(isVideoPaused: nextPaused) : value;
+    if (syncPause) {
+      ref.read(viewerDisplayProvider.notifier).setVideoPaused(nextPaused);
+    } else if (leftLive && ref.read(viewerDisplayProvider).isVideoPaused) {
+      ref.read(viewerDisplayProvider.notifier).setVideoPaused(false);
+    }
+  }
 
   @override
   bool get isNotifierMounted => ref.mounted;
-
   @override
   bool get isHosting => _isHosting;
-
   @override
   set isHosting(bool value) => _isHosting = value;
-
   @override
   String? get activeSessionId => _activeSessionId;
-
   @override
   set activeSessionId(String? value) => _activeSessionId = value;
-
   @override
   int get epoch => _epoch;
-
   @override
   int bumpEpoch() => ++_epoch;
-
   @override
   MediaCaptureService get mediaCapture => ref.read(mediaCaptureServiceProvider);
-
   @override
   WebRtcSessionService get webrtc => ref.read(webrtcSessionServiceProvider);
 
@@ -94,20 +100,16 @@ class SessionNotifier extends Notifier<SessionState> implements SessionContext {
   SessionState build() {
     ref.onDispose(_bridge.dispose);
     ref.listen<DeviceRole>(activeRoleProvider, (prev, next) {
-      if (prev != null && prev != next) {
-        unawaited(
-          prev == .receiver
-              ? stopHosting()
-              : (_isHosting
-                    ? stopWebBroadcast()
-                    : _senderFlow.teardown(this, .idle, stopListening: true)),
-        );
-      }
+      if (prev == null || prev == next) return;
+      unawaited(
+        prev == .receiver
+            ? stopHosting()
+            : (_isHosting
+                ? stopWebBroadcast()
+                : _senderFlow.teardown(this, .idle, stopListening: true)),
+      );
     });
-    ref.listen<int>(streamConfigProvider.select((c) => c.videoBitrate), (
-      _,
-      bps,
-    ) {
+    ref.listen<int>(streamConfigProvider.select((c) => c.videoBitrate), (_, bps) {
       if ((!_isHosting || state.isWebBroadcast) &&
           (state.phase == .streaming || state.phase == .connecting)) {
         unawaited(webrtc.applyBitrateLimit(bps));
@@ -141,18 +143,13 @@ class SessionNotifier extends Notifier<SessionState> implements SessionContext {
     try {
       await ref.read(lanDiscoveryServiceProvider).startListening();
       if (_epoch != epoch || !ref.mounted) return;
-      unawaited(
-        ref.read(usbLoopbackPeersProvider.notifier).refresh(ignoreSessionId: _activeSessionId),
-      );
+      unawaited(ref.read(usbLoopbackPeersProvider.notifier).refresh(ignoreSessionId: _activeSessionId));
       if (state.phase == .idle || state.phase == .failed) {
         state = state.copyWith(phase: .discovering, clearError: true);
       }
     } catch (e) {
       if (_epoch != epoch || !ref.mounted) return;
-      state = state.copyWith(
-        phase: .failed,
-        errorMessage: friendlySessionError(e),
-      );
+      state = state.copyWith(phase: .failed, errorMessage: friendlySessionError(e));
     }
   }
 
@@ -170,144 +167,57 @@ class SessionNotifier extends Notifier<SessionState> implements SessionContext {
         this,
         target,
         pin: pin,
-        onHostPeerFailed: (err) =>
-            _hostFlow.resetPeerToLobby(this, errorMessage: err),
+        onHostPeerFailed: (err) => _hostFlow.resetPeerToLobby(this, errorMessage: err),
       );
 
   /// Enumerates desktop screens and windows for screen-share selection.
-  Future<List<DesktopSourceItem>> loadDesktopSources() =>
-      mediaCapture.getDesktopSources();
+  Future<List<DesktopSourceItem>> loadDesktopSources() => mediaCapture.getDesktopSources();
 
   /// Switches front/back camera during an active camera broadcast.
-  Future<void> switchCamera() =>
-      applyLocalCameraCommand(const RemoteCameraCommand(command: .flip));
+  Future<void> switchCamera() => applyLocalCameraCommand(const RemoteCameraCommand(command: .flip));
 
   /// Mutes or unmutes outgoing microphone audio.
-  void toggleMicMute() {
-    final nextMuted = !state.isMicMuted;
-    mediaCapture.setMicMuted(nextMuted);
-    _syncCameraState(
-      state.remoteCameraState.copyWith(micMuted: nextMuted),
-      isMicMuted: nextMuted,
-    );
-  }
+  void toggleMicMute() => _cameraControls.toggleMicMute(this);
+
+  /// Toggles privacy freeze-frame (`isVideoPaused`) and syncs over DataChannel.
+  void toggleVideoPause() => _cameraControls.toggleVideoPause(this);
+
+  /// Sets privacy freeze-frame (`paused`) and syncs tracks & DataChannel.
+  void setVideoPaused(bool paused) => _cameraControls.setVideoPaused(this, paused);
 
   /// Toggles the mobile camera flash torch when supported.
-  Future<void> toggleTorch() =>
-      applyLocalCameraCommand(const RemoteCameraCommand(command: .torch));
+  Future<void> toggleTorch() => applyLocalCameraCommand(const RemoteCameraCommand(command: .torch));
 
   /// Switches between camera and screen share, replacing track seamlessly.
-  Future<void> changeSource(
-    MediaSourceType source, {
-    String? desktopSourceId,
-  }) async {
-    await _senderFlow.changeSource(
-      this,
-      source,
-      desktopSourceId: desktopSourceId,
-    );
-    if (!ref.mounted) return;
-    _syncCameraState(
-      state.remoteCameraState.copyWith(
-        torchOn: state.isTorchOn,
-        zoom: 1.0,
-        exposureOffset: 0.0,
-        focusLocked: false,
-        controlsSupported:
-            source == .camera && mediaCapture.isCameraControlPlatform,
-      ),
-    );
-  }
+  Future<void> changeSource(MediaSourceType source, {String? desktopSourceId}) =>
+      _cameraControls.changeSource(this, _senderFlow, source, desktopSourceId: desktopSourceId);
 
   /// Sends a remote camera command (`cam_ctrl`) from the Receiver HUD.
-  bool sendRemoteCameraCommand(RemoteCameraCommand cmd) =>
-      webrtc.sendCameraCommand(cmd);
+  bool sendRemoteCameraCommand(RemoteCameraCommand cmd) => webrtc.sendCameraCommand(cmd);
 
   /// Sends a live OBS tally status (`tally`) to the connected Sender.
   bool sendTally(LiveTallyMessage tally) => webrtc.sendTally(tally);
 
   @override
-  void publishCurrentCameraState() {
-    if (!ref.mounted) return;
-    final cfg = ref.read(streamConfigProvider);
-    _syncCameraState(
-      state.remoteCameraState.copyWith(
-        lens: cfg.cameraLens,
-        torchOn: state.isTorchOn,
-        micMuted: state.isMicMuted,
-        voiceClean: cfg.voiceCleanAudio,
-        controlsSupported:
-            cfg.sourceType == .camera && mediaCapture.isCameraControlPlatform,
-      ),
-    );
-  }
+  void publishCurrentCameraState() => _cameraControls.publishCurrentCameraState(this);
 
   @override
-  Future<void> applyLocalCameraCommand(RemoteCameraCommand cmd) async {
-    if (!ref.mounted) return;
-    final cfg = ref.read(streamConfigProvider);
-    final prev = state.remoteCameraState.copyWith(
-      lens: cfg.cameraLens,
-      voiceClean: cfg.voiceCleanAudio,
-    );
-    final next = await mediaCapture.applyCameraCommand(cmd, prev);
-    if (!ref.mounted) return;
-    if (next.lens != cfg.cameraLens) {
-      ref.read(streamConfigProvider.notifier).setCameraLens(next.lens);
-    }
-    if (next.voiceClean != prev.voiceClean) {
-      ref.read(streamConfigProvider.notifier).setVoiceCleanAudio(next.voiceClean);
-    }
-    _syncCameraState(next, isMicMuted: next.micMuted, isTorchOn: next.torchOn);
-  }
-
-  void _syncCameraState(
-    RemoteCameraState camState, {
-    bool? isMicMuted,
-    bool? isTorchOn,
-  }) {
-    state = state.copyWith(
-      remoteCameraState: camState,
-      isMicMuted: isMicMuted,
-      isTorchOn: isTorchOn,
-    );
-    if (!_isHosting || state.isWebBroadcast) webrtc.sendCameraState(camState);
-  }
+  Future<void> applyLocalCameraCommand(RemoteCameraCommand cmd) =>
+      _cameraControls.applyLocalCameraCommand(this, cmd);
 
   /// Sends clipboard text over the active WebRTC control DataChannel.
-  void sendClipboardText(String text) {
-    final trimmed = text.trim();
-    if (trimmed.isEmpty) return;
-    if (!webrtc.sendClipboard(trimmed)) {
-      state = state.copyWith(
-        errorMessage: 'Control channel is not connected yet.',
-      );
-      return;
-    }
-    final item = ClipboardItem(
-      text: trimmed,
-      timestamp: DateTime.now(),
-      fromRemote: false,
-    );
-    state = state.copyWith(
-      clipboardHistory: [item, ...state.clipboardHistory].take(50).toList(),
-    );
-  }
+  void sendClipboardText(String text) => _cameraControls.sendClipboardText(this, text);
 
   /// Gracefully disconnects the active stream or stops hosting/discovery.
   Future<void> disconnect() async {
     if (_isHosting && state.isWebBroadcast) {
       await stopWebBroadcast();
-      if (ref.mounted && ref.read(activeRoleProvider) == .sender) {
-        await startDiscovery();
-      }
+      if (ref.mounted && ref.read(activeRoleProvider) == .sender) await startDiscovery();
       return;
     }
     if (_isHosting) {
       final server = ref.read(signalingServerServiceProvider);
-      if (state.phase == .streaming ||
-          state.phase == .connecting ||
-          state.phase == .reconnecting) {
+      if (state.phase == .streaming || state.phase == .connecting || state.phase == .reconnecting) {
         await server.disconnectClient('Host ended session');
         if (ref.mounted) await _hostFlow.resetPeerToLobby(this);
       } else {
@@ -318,19 +228,15 @@ class SessionNotifier extends Notifier<SessionState> implements SessionContext {
     final client = ref.read(signalingClientServiceProvider);
     final sessionId = _activeSessionId;
     if (client.isConnected && sessionId != null) {
-      client.send(
-        SignalingMessage(
-          type: .bye,
-          sessionId: sessionId,
-          payload: const {'reason': 'Sender disconnected'},
-        ),
-      );
+      client.send(SignalingMessage(
+        type: .bye,
+        sessionId: sessionId,
+        payload: const {'reason': 'Sender disconnected'},
+      ));
     }
     final shouldRediscover = ref.read(activeRoleProvider) == .sender;
     await _senderFlow.teardown(this, .idle);
-    if (ref.mounted && shouldRediscover) {
-      await startDiscovery();
-    }
+    if (ref.mounted && shouldRediscover) await startDiscovery();
   }
 
   /// Dismisses the current error banner message.

@@ -36,6 +36,7 @@ class const ActiveSenderControls({super.key}) extends ConsumerWidget {
     final isCamera = config.sourceType == .camera;
     final showLabels = !context.isCompact || MediaQuery.sizeOf(context).width >= 480;
     final muteLabel = session.isMicMuted ? 'Unmute' : 'Mute';
+    final pauseLabel = session.isVideoPaused ? 'Resume' : 'Pause';
 
     return Center(
       child: ConstrainedBox(
@@ -81,6 +82,19 @@ class const ActiveSenderControls({super.key}) extends ConsumerWidget {
                           showLabel: showLabels,
                           activeColor: session.isMicMuted ? AppColors.accentRed : null,
                           onPressed: notifier.toggleMicMute,
+                        ),
+                        _DockActionButton(
+                          icon: session.isVideoPaused
+                              ? Icons.play_circle_outline_rounded
+                              : Icons.pause_circle_outline_rounded,
+                          label: pauseLabel,
+                          tooltip: shortcuts.tooltipFor(
+                            session.isVideoPaused ? 'Resume Camera' : 'Pause Camera',
+                            .toggleVideoPause,
+                          ),
+                          showLabel: showLabels,
+                          activeColor: session.isVideoPaused ? AppColors.accentOrange : null,
+                          onPressed: notifier.toggleVideoPause,
                         ),
                         if (isCamera && platform.isMobile)
                           _DockActionButton(

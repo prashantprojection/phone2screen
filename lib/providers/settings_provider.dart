@@ -7,7 +7,10 @@ import '../models/camera_rig_preset.dart';
 import '../models/media_source_type.dart';
 import '../models/stream_config.dart';
 import '../models/viewer_display_config.dart';
+import '../models/workspace_mode.dart';
 import 'preferences_provider.dart';
+
+export '../models/workspace_mode.dart';
 
 /// Persistent application preferences for hosting, pairing, and UI theme.
 class const AppSettings({
@@ -16,6 +19,7 @@ class const AppSettings({
   final String pin = '',
   final bool autoCopyClipboard = true,
   final bool ecoDimPreview = false,
+  final WorkspaceMode workspaceMode = .simple,
 }) {
   Map<String, dynamic> toJson() => {
     'themeMode': themeMode.name,
@@ -23,6 +27,7 @@ class const AppSettings({
     'pin': pin,
     'autoCopyClipboard': autoCopyClipboard,
     'ecoDimPreview': ecoDimPreview,
+    'workspaceMode': workspaceMode.name,
   };
 
   static AppSettings fromJson(Map<String, dynamic> json) {
@@ -35,6 +40,8 @@ class const AppSettings({
       pin: json['pin'] is String ? (json['pin'] as String).trim() : '',
       autoCopyClipboard: (json['autoCopyClipboard'] as bool?) ?? true,
       ecoDimPreview: (json['ecoDimPreview'] as bool?) ?? false,
+      workspaceMode:
+          _parseEnum(WorkspaceMode.values, json['workspaceMode']) ?? .simple,
     );
   }
 
@@ -44,12 +51,14 @@ class const AppSettings({
     String? pin,
     bool? autoCopyClipboard,
     bool? ecoDimPreview,
+    WorkspaceMode? workspaceMode,
   }) => AppSettings(
     themeMode: themeMode ?? this.themeMode,
     preferredPort: preferredPort ?? this.preferredPort,
     pin: pin ?? this.pin,
     autoCopyClipboard: autoCopyClipboard ?? this.autoCopyClipboard,
     ecoDimPreview: ecoDimPreview ?? this.ecoDimPreview,
+    workspaceMode: workspaceMode ?? this.workspaceMode,
   );
 
   @override
@@ -61,11 +70,18 @@ class const AppSettings({
           preferredPort == other.preferredPort &&
           pin == other.pin &&
           autoCopyClipboard == other.autoCopyClipboard &&
-          ecoDimPreview == other.ecoDimPreview;
+          ecoDimPreview == other.ecoDimPreview &&
+          workspaceMode == other.workspaceMode;
 
   @override
-  int get hashCode =>
-      Object.hash(themeMode, preferredPort, pin, autoCopyClipboard, ecoDimPreview);
+  int get hashCode => Object.hash(
+    themeMode,
+    preferredPort,
+    pin,
+    autoCopyClipboard,
+    ecoDimPreview,
+    workspaceMode,
+  );
 }
 
 /// Serializes [StreamConfig] to a JSON map for local preference persistence.
@@ -136,6 +152,13 @@ class AppSettingsNotifier extends Notifier<AppSettings> {
 
   void setEcoDimPreview(bool enabled) =>
       state = state.copyWith(ecoDimPreview: enabled);
+
+  void setWorkspaceMode(WorkspaceMode mode) =>
+      state = state.copyWith(workspaceMode: mode);
+
+  void toggleWorkspaceMode() => state = state.copyWith(
+    workspaceMode: state.workspaceMode == .simple ? .studio : .simple,
+  );
 }
 
 /// Active media capture & encoding configuration provider.
@@ -269,6 +292,12 @@ class ViewerDisplayNotifier extends Notifier<ViewerDisplayConfig> {
 
   void setAudioDelayMs(int delayMs) =>
       state = state.copyWith(audioDelayMs: delayMs.clamp(0, 500));
+
+  void toggleVideoPause() =>
+      state = state.copyWith(isVideoPaused: !state.isVideoPaused);
+
+  void setVideoPaused(bool paused) =>
+      state = state.copyWith(isVideoPaused: paused);
 
   void resetFramingAndColor() => state = state.copyWith(
     aspectPreset: .free,

@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../models/camera_control_state.dart';
 import '../../models/shortcut_config.dart';
 import '../../providers/multi_cam_provider.dart';
 import '../../providers/platform_provider.dart';
@@ -144,6 +145,24 @@ class _KeyboardShortcutsScopeState
           ref.read(multiCamProvider.notifier).disconnectAll();
         }
         return true;
+      case .toggleVideoPause:
+        if (isReceiver && isSessionActive) {
+          displayNotifier.toggleVideoPause();
+          if (isPrimaryActive) {
+            sessionNotifier.sendRemoteCameraCommand(
+              RemoteCameraCommand(
+                command: .videoPause,
+                enabled: !display.isVideoPaused,
+              ),
+            );
+          }
+          return true;
+        }
+        if (activeRole == .sender && phase == .streaming) {
+          sessionNotifier.toggleVideoPause();
+          return true;
+        }
+        return false;
     }
   }
 
