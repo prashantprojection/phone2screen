@@ -11,11 +11,13 @@ import 'package:phone2screen/models/signaling_data.dart';
 import 'package:phone2screen/models/signaling_message.dart';
 import 'package:phone2screen/providers/discovery_provider.dart';
 import 'package:phone2screen/providers/platform_provider.dart';
+import 'package:phone2screen/providers/session_provider.dart';
 import 'package:phone2screen/services/network/lan_discovery_service.dart';
 import 'package:phone2screen/services/network/network_address_service.dart';
 import 'package:phone2screen/services/platform_detection_service.dart';
 import 'package:phone2screen/services/signaling/signaling_client_service.dart';
 import 'package:phone2screen/services/signaling/signaling_server_service.dart';
+import 'package:phone2screen/views/shared/app_shell_header.dart';
 
 class const _FakePlatformService() extends PlatformDetectionService {
   @override
@@ -140,42 +142,51 @@ class _FakeSignalingClientService implements SignalingClientService {
   }
 }
 
+class _StreamingSessionNotifier extends SessionNotifier {
+  @override
+  SessionState build() =>
+      const SessionState(phase: .streaming, connectedPeerName: 'Pixel Phone');
+}
+
+Widget _buildTestApp() {
+  return ProviderScope(
+    overrides: [
+      platformServiceProvider.overrideWithValue(const _FakePlatformService()),
+      networkAddressServiceProvider.overrideWithValue(
+        const _FakeNetworkAddressService(),
+      ),
+      lanDiscoveryServiceProvider.overrideWith((ref) {
+        final s = _FakeLanDiscoveryService();
+        ref.onDispose(s.dispose);
+        return s;
+      }),
+      signalingServerServiceProvider.overrideWith((ref) {
+        final s = _FakeSignalingServerService();
+        ref.onDispose(s.dispose);
+        return s;
+      }),
+      signalingClientServiceProvider.overrideWith((ref) {
+        final s = _FakeSignalingClientService();
+        ref.onDispose(s.dispose);
+        return s;
+      }),
+    ],
+    child: const Phone2ScreenApp(),
+  );
+}
+
 void main() {
   testWidgets(
     'renders simplified Receiver, How to Use guide, Send tab, and Settings',
     (tester) async {
-      await tester.binding.setSurfaceSize(const Size(1200, 800));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
+      tester.view.physicalSize = const Size(1200, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            platformServiceProvider.overrideWithValue(
-              const _FakePlatformService(),
-            ),
-            networkAddressServiceProvider.overrideWithValue(
-              const _FakeNetworkAddressService(),
-            ),
-            lanDiscoveryServiceProvider.overrideWith((ref) {
-              final s = _FakeLanDiscoveryService();
-              ref.onDispose(s.dispose);
-              return s;
-            }),
-            signalingServerServiceProvider.overrideWith((ref) {
-              final s = _FakeSignalingServerService();
-              ref.onDispose(s.dispose);
-              return s;
-            }),
-            signalingClientServiceProvider.overrideWith((ref) {
-              final s = _FakeSignalingClientService();
-              ref.onDispose(s.dispose);
-              return s;
-            }),
-          ],
-          child: const Phone2ScreenApp(),
-        ),
-      );
-
+      await tester.pumpWidget(_buildTestApp());
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
@@ -206,6 +217,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
+      expect(find.text('Share Camera or Screen'), findsOneWidget);
       expect(find.text('What to Share'), findsOneWidget);
       expect(find.text('Nearby Screens'), findsOneWidget);
       expect(find.text('Cast to Web Browser'), findsOneWidget);
@@ -216,14 +228,77 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Settings'), findsOneWidget);
+      expect(find.text('Appearance'), findsOneWidget);
       expect(find.text('Video & Audio'), findsOneWidget);
       expect(find.text('Battery Saver Preview'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Keyboard Shortcuts'),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Keyboard Shortcuts'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('How to Use Phone2Screen'),
         250,
         scrollable: find.byType(Scrollable).first,
       );
       expect(find.text('How to Use Phone2Screen'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'renders compact phone layout across Receive, Send, and Settings with zero overflow',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(_buildTestApp());
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text('Ready on Test Desktop'), findsOneWidget);
+
+      await tester.tap(find.text('Send'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text('Share Camera or Screen'), findsOneWidget);
+      expect(find.text('What to Share'), findsOneWidget);
+      expect(find.text('Nearby Screens'), findsOneWidget);
+      expect(find.text('Cast to Web Browser'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Settings'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Settings'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Customize Shortcut Keys'),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Customize Shortcut Keys'), findsOneWidget);
+      expect(find.text('Fullscreen'), findsNothing);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          key: const ValueKey('streaming-scope'),
+          overrides: [
+            platformServiceProvider.overrideWithValue(
+              const _FakePlatformService(),
+            ),
+            sessionProvider.overrideWith(_StreamingSessionNotifier.new),
+          ],
+          child: MaterialApp(
+            home: Scaffold(appBar: AppShellHeader(onOpenSettings: () {})),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.byTooltip('Fullscreen (F)'), findsOneWidget);
     },
   );
 }

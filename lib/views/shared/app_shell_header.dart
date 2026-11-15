@@ -39,9 +39,17 @@ class const AppShellHeader({super.key, required final VoidCallback onOpenSetting
           child: LayoutBuilder(
             builder: (context, constraints) {
               final wide = constraints.maxWidth >= 680;
+              final compact = constraints.maxWidth < 460;
               final showTitle = constraints.maxWidth >= 500;
+              final iconStyle = compact
+                  ? IconButton.styleFrom(
+                      padding: const .all(6),
+                      minimumSize: const Size(34, 34),
+                      tapTargetSize: .shrinkWrap,
+                    )
+                  : null;
               return Row(
-                spacing: wide ? 8 : 4,
+                spacing: wide ? 8 : (compact ? 4 : 6),
                 children: [
                   Container(
                     width: 34,
@@ -52,20 +60,28 @@ class const AppShellHeader({super.key, required final VoidCallback onOpenSetting
                   if (showTitle)
                     Text('Phone2Screen', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: .w700)),
                   _PhasePill(phase: session.phase, showLabel: wide),
-                  const Spacer(),
-                  SegmentedButton<DeviceRole>(
-                    showSelectedIcon: false,
-                    style: ButtonStyle(
-                      visualDensity: .compact,
-                      tapTargetSize: .shrinkWrap,
-                      padding: WidgetStatePropertyAll(.symmetric(horizontal: wide ? 10 : 8)),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: FittedBox(
+                        fit: .scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: SegmentedButton<DeviceRole>(
+                          showSelectedIcon: false,
+                          style: ButtonStyle(
+                            visualDensity: .compact,
+                            tapTargetSize: .shrinkWrap,
+                            padding: WidgetStatePropertyAll(.symmetric(horizontal: wide ? 10 : 8)),
+                          ),
+                          segments: const [
+                            ButtonSegment(value: .receiver, label: Text('Receive')),
+                            ButtonSegment(value: .sender, label: Text('Send')),
+                          ],
+                          selected: {activeRole},
+                          onSelectionChanged: (s) => _onRoleSelected(context, ref, activeRole, s.first, session.phase),
+                        ),
+                      ),
                     ),
-                    segments: const [
-                      ButtonSegment(value: .receiver, label: Text('Receive')),
-                      ButtonSegment(value: .sender, label: Text('Send')),
-                    ],
-                    selected: {activeRole},
-                    onSelectionChanged: (s) => _onRoleSelected(context, ref, activeRole, s.first, session.phase),
                   ),
                   if (canFullscreen)
                     IconButton(
@@ -73,18 +89,21 @@ class const AppShellHeader({super.key, required final VoidCallback onOpenSetting
                           ref.read(viewerDisplayProvider.notifier).toggleFullscreen(),
                       icon: const Icon(Icons.fullscreen_rounded),
                       tooltip: shortcuts.tooltipFor('Fullscreen', .toggleFullscreen),
+                      style: iconStyle,
                       visualDensity: .compact,
                     ),
                   IconButton(
                     onPressed: () => HowToUseSheet.show(context),
                     icon: const Icon(Icons.help_outline_rounded),
                     tooltip: shortcuts.tooltipFor('How to Use', .openGuide),
+                    style: iconStyle,
                     visualDensity: .compact,
                   ),
                   IconButton(
                     onPressed: onOpenSettings,
                     icon: const Icon(Icons.settings_outlined),
                     tooltip: 'Settings',
+                    style: iconStyle,
                     visualDensity: .compact,
                   ),
                 ],

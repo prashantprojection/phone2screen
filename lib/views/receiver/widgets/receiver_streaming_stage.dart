@@ -1,8 +1,10 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../models/viewer_display_config.dart';
 import '../../../providers/session_provider.dart';
+import '../../../providers/settings_provider.dart';
 import '../../shared/error_banner.dart';
 import '../../shared/video_stage_widget.dart';
 import 'fullscreen_stage_view.dart';
@@ -16,9 +18,9 @@ class const ReceiverStreamingStage({
   required final ViewerDisplayConfig display,
   required final VoidCallback onExitFullscreen,
   required final VoidCallback onDismissError,
-}) extends StatelessWidget {
+}) extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (display.isFullscreen) {
       return FullscreenStageView(
         session: session,
@@ -46,25 +48,34 @@ class const ReceiverStreamingStage({
             child: Stack(
               children: [
                 Positioned.fill(
-                  child: VideoStageWidget(
-                    stream: session.remoteStream,
-                    displayConfig: display,
-                    waitingLabel: waitingLabel,
+                  child: GestureDetector(
+                    behavior: .opaque,
+                    onDoubleTap: () =>
+                        ref.read(viewerDisplayProvider.notifier).toggleFullscreen(),
+                    child: VideoStageWidget(
+                      stream: session.remoteStream,
+                      displayConfig: display,
+                      waitingLabel: waitingLabel,
+                    ),
                   ),
                 ),
                 Positioned(
                   top: 12,
                   left: 12,
                   right: 12,
-                  child: Wrap(
-                    alignment: .spaceBetween,
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      if (display.showTelemetry) TelemetryOverlay(telemetry: session.telemetry),
-                      if (session.connectedPeerName != null)
-                        _PeerBadge(name: session.connectedPeerName!),
-                    ],
+                  child: IgnorePointer(
+                    child: Wrap(
+                      alignment: .spaceBetween,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        display.showTelemetry
+                            ? TelemetryOverlay(telemetry: session.telemetry)
+                            : const SizedBox.shrink(),
+                        if (session.connectedPeerName != null)
+                          _PeerBadge(name: session.connectedPeerName!),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -84,20 +95,33 @@ class const _PeerBadge({required final String name}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const .symmetric(horizontal: 12, vertical: 8),
+      padding: const .symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
         color: AppColors.backgroundDark.withValues(alpha: 0.72),
         borderRadius: .circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
       ),
       child: Row(
         mainAxisSize: .min,
-        spacing: 6,
+        spacing: 7,
         children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: const BoxDecoration(color: AppColors.accentGreen, shape: .circle),
+          ),
           const Icon(Icons.smartphone_rounded, size: 14, color: AppColors.primaryLight),
-          Text(
-            name,
-            style: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 12, fontWeight: .w600),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 180),
+            child: Text(
+              name,
+              overflow: .ellipsis,
+              style: const TextStyle(
+                color: AppColors.textPrimaryDark,
+                fontSize: 12,
+                fontWeight: .w600,
+              ),
+            ),
           ),
         ],
       ),

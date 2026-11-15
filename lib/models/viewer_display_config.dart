@@ -6,7 +6,7 @@ class const ViewerDisplayConfig({
   final bool audioMuted = false,
   final bool isFullscreen = false,
   final bool fullscreenHudVisible = true,
-  final bool showTelemetry = true,
+  final bool showTelemetry = false,
 }) {
   /// Returns a copy with any provided viewport flags updated.
   ViewerDisplayConfig copyWith({

@@ -17,6 +17,22 @@ Future<void> _waitUntil(bool Function() condition) async {
   }
 }
 
+void _expectResponsiveWebShell(String html, List<String> extraTokens) {
+  const sharedTokens = [
+    'viewport-fit=cover',
+    '100dvh',
+    'btnFit',
+    'btnRotate',
+    'btnMirror',
+    'btnClipOpen',
+    'btnStats',
+    'btnFs',
+  ];
+  for (final token in [...sharedTokens, ...extraTokens]) {
+    expect(html, contains(token));
+  }
+}
+
 void main() {
   test('hello -> welcome and offer -> answer -> ice loopback round-trip', () async {
     final server = SignalingServerService();
@@ -178,7 +194,11 @@ void main() {
     expect(resp.statusCode, HttpStatus.ok);
     expect(body, contains('"mode":"sender"'));
     expect(body, contains('"httpsPort":$httpsPort'));
-    expect(body, contains('Switch to Secure HTTPS'));
+    _expectResponsiveWebShell(body, const [
+      'Stream Camera',
+      'Share Screen',
+      'Switch to Secure HTTPS',
+    ]);
 
     final tlsReq = await httpClient.getUrl(
       Uri.parse('https://127.0.0.1:$httpsPort/health'),
@@ -225,7 +245,11 @@ void main() {
     final html = await utf8.decodeStream(resp);
     expect(resp.statusCode, HttpStatus.ok);
     expect(html, contains('"mode":"viewer"'));
-    expect(html, contains('Watch Stream'));
+    _expectResponsiveWebShell(html, const [
+      'Watch Stream',
+      'id="btnFit"',
+      'id="btnRotate"',
+    ]);
 
     await client.connect(
       target: SignalingData(

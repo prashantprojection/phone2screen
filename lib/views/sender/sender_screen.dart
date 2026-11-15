@@ -10,14 +10,13 @@ import '../shared/error_banner.dart';
 import '../shared/video_stage_widget.dart';
 import 'widgets/active_sender_controls.dart';
 import 'widgets/desktop_source_dialog.dart';
-import 'widgets/manual_connect_sheet.dart';
 import 'widgets/nearby_devices_list.dart';
 import 'widgets/pin_prompt_dialog.dart';
 import 'widgets/qr_scanner_page.dart';
 import 'widgets/source_picker_card.dart';
 import 'widgets/web_broadcast_card.dart';
 
-/// Adaptive Sender view for discovering Receivers and broadcasting live video.
+/// Adaptive Sender view for guided 1 -> 2 casting and live streaming HUD.
 class const SenderScreen({super.key}) extends ConsumerStatefulWidget {
   @override
   ConsumerState<SenderScreen> createState() => _SenderScreenState();
@@ -28,9 +27,7 @@ class _SenderScreenState extends ConsumerState<SenderScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        ref.read(sessionProvider.notifier).startDiscovery();
-      }
+      if (mounted) ref.read(sessionProvider.notifier).startDiscovery();
     });
   }
 
@@ -48,15 +45,12 @@ class _SenderScreenState extends ConsumerState<SenderScreen> {
   Future<void> _startWebBroadcast() async {
     final config = ref.read(streamConfigProvider);
     final platform = ref.read(platformServiceProvider);
-    if (config.sourceType == .screen &&
-        platform.supportsDesktopPicker &&
-        config.desktopSourceId == null) {
+    if (config.sourceType == .screen && platform.supportsDesktopPicker && config.desktopSourceId == null) {
       final picked = await DesktopSourceDialog.show(context);
       if (picked == null || !mounted) return;
       ref.read(streamConfigProvider.notifier).setDesktopSourceId(picked.id);
     }
-    if (!mounted) return;
-    await ref.read(sessionProvider.notifier).startWebBroadcast();
+    if (mounted) await ref.read(sessionProvider.notifier).startWebBroadcast();
   }
 
   @override
@@ -64,24 +58,20 @@ class _SenderScreenState extends ConsumerState<SenderScreen> {
     final session = ref.watch(sessionProvider);
     final settings = ref.watch(appSettingsProvider);
     final platform = ref.watch(platformServiceProvider);
-    final isLive =
-        session.phase == .connecting ||
-        session.phase == .streaming ||
-        session.phase == .reconnecting;
+    final isLive = session.phase == .connecting || session.phase == .streaming || session.phase == .reconnecting;
 
-    if (session.isWebBroadcast && session.phase == .hosting) {
-      return WebBroadcastLobbyView(session: session);
-    }
+    if (session.isWebBroadcast && session.phase == .hosting) return WebBroadcastLobbyView(session: session);
+    if (isLive) return _buildLiveView(context, session, settings);
 
-    if (isLive) {
-      return _buildLiveView(context, session, settings);
-    }
+    final theme = Theme.of(context);
+    final nearbyList = NearbyDevicesList(onScanQr: platform.supportsQrScanner ? _scanQrAndConnect : null);
+    final browserCard = platform.canHostServer ? _BrowserCastCard(onStart: _startWebBroadcast) : null;
 
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
         child: SingleChildScrollView(
-          padding: const .all(16),
+          padding: .all(context.isCompact ? 16 : 20),
           child: Column(
             crossAxisAlignment: .stretch,
             spacing: 16,
@@ -92,47 +82,31 @@ class _SenderScreenState extends ConsumerState<SenderScreen> {
                   onRetry: () => ref.read(sessionProvider.notifier).startDiscovery(),
                   onDismiss: () => ref.read(sessionProvider.notifier).clearError(),
                 ),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
+              Column(
+                crossAxisAlignment: .start,
+                spacing: 4,
                 children: [
-                  if (platform.supportsQrScanner)
-                    FilledButton.icon(
-                      onPressed: _scanQrAndConnect,
-                      icon: const Icon(Icons.qr_code_scanner_rounded),
-                      label: const Text('Scan QR Code'),
-                    ),
-                  if (platform.canHostServer)
-                    FilledButton.tonalIcon(
-                      onPressed: _startWebBroadcast,
-                      icon: const Icon(Icons.public_rounded),
-                      label: const Text('Cast to Web Browser'),
-                    ),
-                  OutlinedButton.icon(
-                    onPressed: () => ManualConnectSheet.show(context),
-                    icon: const Icon(Icons.dns_outlined),
-                    label: const Text('Enter IP Manually'),
+                  Text('Share Camera or Screen', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: .w700)),
+                  Text(
+                    'Choose what to share first, then tap a nearby screen or cast to any web browser.',
+                    style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                   ),
                 ],
               ),
               if (context.isExpanded)
-                const Row(
+                Row(
                   crossAxisAlignment: .start,
-                  spacing: 16,
+                  spacing: 20,
                   children: [
-                    Expanded(flex: 5, child: SourcePickerCard()),
-                    Expanded(flex: 6, child: NearbyDevicesList()),
+                    Expanded(
+                      flex: 5,
+                      child: Column(crossAxisAlignment: .stretch, spacing: 16, children: [const SourcePickerCard(), ?browserCard]),
+                    ),
+                    Expanded(flex: 6, child: nearbyList),
                   ],
                 )
               else
-                const Column(
-                  crossAxisAlignment: .stretch,
-                  spacing: 16,
-                  children: [
-                    SourcePickerCard(),
-                    NearbyDevicesList(),
-                  ],
-                ),
+                Column(crossAxisAlignment: .stretch, spacing: 16, children: [const SourcePickerCard(), nearbyList, ?browserCard]),
             ],
           ),
         ),
@@ -140,65 +114,52 @@ class _SenderScreenState extends ConsumerState<SenderScreen> {
     );
   }
 
-  Widget _buildLiveView(
-    BuildContext context,
-    SessionState session,
-    AppSettings settings,
-  ) {
-    final theme = Theme.of(context);
-    final peerName =
-        session.connectedPeerName ?? session.activeEndpoint?.deviceName ?? 'Receiver';
+  Widget _buildLiveView(BuildContext context, SessionState session, AppSettings settings) {
+    final peerName = session.connectedPeerName ?? session.activeEndpoint?.deviceName ?? 'Receiver';
     final showEcoCard = settings.ecoDimPreview && session.phase == .streaming;
-    final statusColor = session.phase == .streaming
-        ? AppColors.accentGreen
-        : AppColors.accentOrange;
+    final statusColor = session.phase == .streaming ? AppColors.accentGreen : AppColors.accentOrange;
+    final statusLabel = '${session.phase == .streaming ? "Live" : "Connecting"} • $peerName';
 
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: context.contentMaxWidth),
         child: Padding(
-          padding: const .all(16),
+          padding: .all(context.isCompact ? 14 : 16),
           child: Column(
             crossAxisAlignment: .stretch,
             spacing: 12,
             children: [
-              Card(
-                child: Padding(
-                  padding: const .symmetric(horizontal: 14, vertical: 10),
-                  child: Row(
-                    spacing: 10,
-                    children: [
-                      Icon(Icons.cast_connected_rounded, color: statusColor, size: 20),
-                      Expanded(
-                        child: Text(
-                          peerName,
-                          maxLines: 1,
-                          overflow: .ellipsis,
-                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: .w700),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
               if (session.errorMessage != null)
-                ErrorBanner(
-                  message: session.errorMessage!,
-                  onDismiss: () => ref.read(sessionProvider.notifier).clearError(),
-                ),
+                ErrorBanner(message: session.errorMessage!, onDismiss: () => ref.read(sessionProvider.notifier).clearError()),
               Expanded(
-                child: showEcoCard
-                    ? _EcoDimPreviewCard(
-                        onShowPreview: () => ref
-                            .read(appSettingsProvider.notifier)
-                            .setEcoDimPreview(false),
-                      )
-                    : VideoStageWidget(
-                        stream: session.localStream,
-                        waitingLabel: session.phase == .connecting
-                            ? 'Connecting to $peerName...'
-                            : 'Preparing stream...',
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: showEcoCard
+                          ? _EcoDimPreviewCard(onShowPreview: () => ref.read(appSettingsProvider.notifier).setEcoDimPreview(false))
+                          : VideoStageWidget(
+                              stream: session.localStream,
+                              waitingLabel: session.phase == .connecting ? 'Connecting to $peerName...' : 'Preparing stream...',
+                            ),
+                    ),
+                    Positioned(
+                      top: 12,
+                      left: 12,
+                      right: 12,
+                      child: Row(
+                        mainAxisAlignment: .spaceBetween,
+                        spacing: 8,
+                        children: [
+                          Flexible(child: _LiveStatusPill(label: statusLabel, color: statusColor)),
+                          _BatterySaverPill(
+                            active: settings.ecoDimPreview,
+                            onToggle: () => ref.read(appSettingsProvider.notifier).setEcoDimPreview(!settings.ecoDimPreview),
+                          ),
+                        ],
                       ),
+                    ),
+                  ],
+                ),
               ),
               const ActiveSenderControls(),
             ],
@@ -209,44 +170,105 @@ class _SenderScreenState extends ConsumerState<SenderScreen> {
   }
 }
 
-class const _EcoDimPreviewCard({required final VoidCallback onShowPreview})
-    extends StatelessWidget {
+class const _BrowserCastCard({required final VoidCallback onStart}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     return Card(
-      color: AppColors.backgroundDark,
-      child: Center(
-        child: Padding(
-          padding: const .all(24),
-          child: Column(
-            mainAxisSize: .min,
-            spacing: 12,
-            children: [
-              const Icon(Icons.battery_saver_rounded, size: 48, color: AppColors.accentGreen),
-              Text(
-                'Battery Saver Active',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: AppColors.textPrimaryDark,
-                  fontWeight: .w700,
+      child: Padding(
+        padding: const .all(18),
+        child: Column(
+          crossAxisAlignment: .stretch,
+          spacing: 12,
+          children: [
+            Row(
+              crossAxisAlignment: .start,
+              spacing: 12,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(color: colors.primary.withValues(alpha: 0.14), borderRadius: .circular(11)),
+                  child: Icon(Icons.public_rounded, color: colors.primary, size: 22),
                 ),
-              ),
-              Text(
-                'Preview is paused here to save battery and keep your phone cool. Your stream is still live!',
-                textAlign: .center,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondaryDark,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: .start,
+                    spacing: 3,
+                    children: [
+                      Text('Watch in Any Browser', style: theme.textTheme.titleMedium?.copyWith(fontWeight: .w700)),
+                      Text('No app on the TV or laptop? Open a live link in any browser.', style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
+                    ],
+                  ),
                 ),
-              ),
-              OutlinedButton.icon(
-                onPressed: onShowPreview,
-                icon: const Icon(Icons.visibility_outlined),
-                label: const Text('Show Preview'),
-              ),
-            ],
-          ),
+              ],
+            ),
+            FilledButton.tonalIcon(onPressed: onStart, icon: const Icon(Icons.public_rounded, size: 18), label: const Text('Cast to Web Browser')),
+          ],
         ),
       ),
     );
   }
+}
+
+class const _LiveStatusPill({required final String label, required final Color color}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const .symmetric(horizontal: 12, vertical: 7),
+    decoration: BoxDecoration(color: AppColors.backgroundDark.withValues(alpha: 0.74), borderRadius: .circular(999), border: Border.all(color: Colors.white.withValues(alpha: 0.16))),
+    child: Row(
+      mainAxisSize: .min,
+      spacing: 7,
+      children: [
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: .circle)),
+        Flexible(child: Text(label, maxLines: 1, overflow: .ellipsis, style: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 12, fontWeight: .w600))),
+      ],
+    ),
+  );
+}
+
+class const _BatterySaverPill({required final bool active, required final VoidCallback onToggle}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final fg = active ? AppColors.accentGreen : AppColors.textPrimaryDark;
+    return Material(
+      color: AppColors.backgroundDark.withValues(alpha: active ? 0.86 : 0.74),
+      shape: StadiumBorder(side: BorderSide(color: active ? AppColors.accentGreen.withValues(alpha: 0.65) : Colors.white.withValues(alpha: 0.16))),
+      clipBehavior: .antiAlias,
+      child: InkWell(
+        onTap: onToggle,
+        child: Padding(
+          padding: const .symmetric(horizontal: 12, vertical: 7),
+          child: Row(mainAxisSize: .min, spacing: 6, children: [Icon(Icons.battery_saver_rounded, size: 15, color: fg), Text('Battery Saver', style: TextStyle(color: fg, fontSize: 12, fontWeight: .w600))]),
+        ),
+      ),
+    );
+  }
+}
+
+class const _EcoDimPreviewCard({required final VoidCallback onShowPreview}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Card(
+    color: AppColors.backgroundDark,
+    child: Center(
+      child: Padding(
+        padding: const .all(24),
+        child: Column(
+          mainAxisSize: .min,
+          spacing: 12,
+          children: [
+            const Icon(Icons.battery_saver_rounded, size: 48, color: AppColors.accentGreen),
+            Text('Battery Saver Active', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppColors.textPrimaryDark, fontWeight: .w700)),
+            Text(
+              'Preview is paused here to save battery and keep your phone cool. Your stream is still live!',
+              textAlign: .center,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondaryDark),
+            ),
+            OutlinedButton.icon(onPressed: onShowPreview, icon: const Icon(Icons.visibility_outlined), label: const Text('Show Preview')),
+          ],
+        ),
+      ),
+    ),
+  );
 }

@@ -117,7 +117,8 @@ void main() {
     test('ViewerDisplayConfig copyWith updates display transforms', () {
       const defaults = ViewerDisplayConfig();
       expect(defaults.coverFit, isFalse);
-      expect(defaults.showTelemetry, isTrue);
+      expect(defaults.fullscreenHudVisible, isTrue);
+      expect(defaults.showTelemetry, isFalse);
 
       final updated = defaults.copyWith(
         coverFit: true,
@@ -125,14 +126,16 @@ void main() {
         quarterTurns: 1,
         audioMuted: true,
         isFullscreen: true,
-        showTelemetry: false,
+        fullscreenHudVisible: false,
+        showTelemetry: true,
       );
       expect(updated.coverFit, isTrue);
       expect(updated.mirrored, isTrue);
       expect(updated.quarterTurns, 1);
       expect(updated.audioMuted, isTrue);
       expect(updated.isFullscreen, isTrue);
-      expect(updated.showTelemetry, isFalse);
+      expect(updated.fullscreenHudVisible, isFalse);
+      expect(updated.showTelemetry, isTrue);
     });
   });
 }
