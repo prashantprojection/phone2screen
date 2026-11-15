@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../core/constants/stream_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../models/discovered_peer.dart';
 import '../../../models/signaling_data.dart';
 import '../../../providers/discovery_provider.dart';
 import '../../../providers/preferences_provider.dart';
@@ -25,9 +26,15 @@ class const NearbyDevicesList({
     await ref.read(sessionProvider.notifier).connectAndStream(endpoint, pin: pin);
   }
 
-  Future<void> _connectViaUsbAdb(WidgetRef ref) async {
+  Future<void> _connectViaUsbAdb(BuildContext context, WidgetRef ref) async {
     final port = ref.read(appSettingsProvider).preferredPort;
     final effectivePort = port > 0 ? port : StreamConstants.defaultSignalingPort;
+    final probed = await ref.read(usbBridgeServiceProvider).probeLoopbackReceivers();
+    if (!context.mounted) return;
+    if (probed.isNotEmpty) {
+      await _connectToEndpoint(context, ref, probed.first.endpoint);
+      return;
+    }
     final target = SignalingData(
       ip: '127.0.0.1',
       port: effectivePort,
@@ -39,7 +46,7 @@ class const NearbyDevicesList({
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final peers = ref.watch(discoveredPeersProvider).value ?? const [];
+    final peers = ref.watch(allDiscoveredPeersProvider);
     final lastEndpoint = ref.watch(lastEndpointProvider);
     final showReconnect =
         lastEndpoint != null &&
@@ -79,35 +86,7 @@ class const NearbyDevicesList({
                 crossAxisAlignment: .stretch,
                 spacing: 8,
                 children: [
-                  for (final peer in peers)
-                    ListTile(
-                      contentPadding: const .symmetric(horizontal: 12, vertical: 4),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: .circular(14),
-                        side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.42)),
-                      ),
-                      tileColor: colors.surfaceContainer,
-                      leading: CircleAvatar(
-                        backgroundColor: AppColors.primaryBlue.withValues(alpha: 0.12),
-                        child: const Icon(Icons.desktop_windows_rounded, color: AppColors.primaryLight, size: 20),
-                      ),
-                      title: Text(peer.endpoint.deviceName, maxLines: 1, overflow: .ellipsis, style: theme.textTheme.titleSmall?.copyWith(fontWeight: .w600)),
-                      subtitle: Text('${peer.endpoint.ip}:${peer.endpoint.port}', maxLines: 1, overflow: .ellipsis),
-                      trailing: Row(
-                        mainAxisSize: .min,
-                        spacing: 8,
-                        children: [
-                          if (peer.endpoint.requiresPin)
-                            const Tooltip(message: 'PIN required', child: Icon(Icons.lock_outline_rounded, size: 18, color: AppColors.accentOrange)),
-                          FilledButton(
-                            style: FilledButton.styleFrom(shape: const StadiumBorder(), padding: const .symmetric(horizontal: 16, vertical: 10)),
-                            onPressed: () => _connectToEndpoint(context, ref, peer.endpoint),
-                            child: const Text('Connect'),
-                          ),
-                        ],
-                      ),
-                      onTap: () => _connectToEndpoint(context, ref, peer.endpoint),
-                    ),
+                  for (final peer in peers) _buildPeerTile(context, ref, peer, theme),
                 ],
               ),
             const Divider(height: 1),
@@ -136,7 +115,7 @@ class const NearbyDevicesList({
                     shape: const StadiumBorder(),
                     side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.65)),
                   ),
-                  onPressed: () => _connectViaUsbAdb(ref),
+                  onPressed: () => _connectViaUsbAdb(context, ref),
                   icon: const Icon(Icons.usb_rounded, size: 18),
                   label: const Text('USB / ADB'),
                 ),
@@ -145,6 +124,39 @@ class const NearbyDevicesList({
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPeerTile(BuildContext context, WidgetRef ref, DiscoveredPeer peer, ThemeData theme) {
+    final isUsb = peer.isUsbLoopback || peer.endpoint.ip == '127.0.0.1';
+    final ep = peer.endpoint;
+    final colors = theme.colorScheme;
+    return ListTile(
+      contentPadding: const .symmetric(horizontal: 12, vertical: 4),
+      shape: RoundedRectangleBorder(
+        borderRadius: .circular(14),
+        side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.42)),
+      ),
+      tileColor: colors.surfaceContainer,
+      leading: CircleAvatar(
+        backgroundColor: (isUsb ? AppColors.accentGreen : AppColors.primaryBlue).withValues(alpha: 0.12),
+        child: Icon(isUsb ? Icons.usb_rounded : Icons.desktop_windows_rounded, color: isUsb ? AppColors.accentGreen : AppColors.primaryLight, size: 20),
+      ),
+      title: Text(ep.deviceName, maxLines: 1, overflow: .ellipsis, style: theme.textTheme.titleSmall?.copyWith(fontWeight: .w600)),
+      subtitle: Text(isUsb ? 'USB Wired • Zero-Latency (${ep.ip}:${ep.port})' : '${ep.ip}:${ep.port}', maxLines: 1, overflow: .ellipsis),
+      trailing: Row(
+        mainAxisSize: .min,
+        spacing: 8,
+        children: [
+          if (ep.requiresPin) const Tooltip(message: 'PIN required', child: Icon(Icons.lock_outline_rounded, size: 18, color: AppColors.accentOrange)),
+          FilledButton(
+            style: FilledButton.styleFrom(shape: const StadiumBorder(), padding: const .symmetric(horizontal: 16, vertical: 10)),
+            onPressed: () => _connectToEndpoint(context, ref, ep),
+            child: const Text('Connect'),
+          ),
+        ],
+      ),
+      onTap: () => _connectToEndpoint(context, ref, ep),
     );
   }
 }

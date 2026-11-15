@@ -38,6 +38,7 @@ class const StreamConfig({
   final int frameRate = 30,
   final int videoBitrate = 3_500_000,
   final bool enableAudio = true,
+  final bool voiceCleanAudio = true,
   final CameraLens cameraLens = .back,
   final MediaSourceType sourceType = .camera,
   final String? desktopSourceId,
@@ -50,6 +51,7 @@ class const StreamConfig({
     int? frameRate,
     int? videoBitrate,
     bool? enableAudio,
+    bool? voiceCleanAudio,
     CameraLens? cameraLens,
     MediaSourceType? sourceType,
     String? desktopSourceId,
@@ -60,6 +62,7 @@ class const StreamConfig({
       frameRate: frameRate ?? this.frameRate,
       videoBitrate: videoBitrate ?? this.videoBitrate,
       enableAudio: enableAudio ?? this.enableAudio,
+      voiceCleanAudio: voiceCleanAudio ?? this.voiceCleanAudio,
       cameraLens: cameraLens ?? this.cameraLens,
       sourceType: sourceType ?? this.sourceType,
       desktopSourceId: clearDesktopSource
@@ -77,6 +80,7 @@ class const StreamConfig({
           frameRate == other.frameRate &&
           videoBitrate == other.videoBitrate &&
           enableAudio == other.enableAudio &&
+          voiceCleanAudio == other.voiceCleanAudio &&
           cameraLens == other.cameraLens &&
           sourceType == other.sourceType &&
           desktopSourceId == other.desktopSourceId;
@@ -87,6 +91,7 @@ class const StreamConfig({
     frameRate,
     videoBitrate,
     enableAudio,
+    voiceCleanAudio,
     cameraLens,
     sourceType,
     desktopSourceId,

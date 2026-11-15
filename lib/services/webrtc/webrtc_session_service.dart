@@ -5,6 +5,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import '../../core/constants/stream_constants.dart';
 import '../../models/camera_control_state.dart';
 import '../../models/clipboard_item.dart';
+import '../../models/obs_sync_state.dart';
 import '../../models/stream_telemetry.dart';
 import 'data_channel_helper.dart';
 import 'rtc_stats_sampler.dart';
@@ -64,6 +65,10 @@ class WebRtcSessionService {
   /// Emits authoritative camera state (`cam_state`) snapshots from broadcaster.
   Stream<RemoteCameraState> get incomingCameraStates =>
       _dataChannelHelper.incomingCameraStates;
+
+  /// Emits live OBS tally updates (`tally`) received from the host Receiver.
+  Stream<LiveTallyMessage> get incomingTally =>
+      _dataChannelHelper.incomingTally;
 
   /// Emits when the `phone2screen-control` DataChannel transitions to open.
   Stream<void> get onControlChannelOpen => _dataChannelHelper.onChannelOpen;
@@ -196,6 +201,9 @@ class WebRtcSessionService {
   /// Sends authoritative camera state (`cam_state`) across the control channel.
   bool sendCameraState(RemoteCameraState state) =>
       _dataChannelHelper.sendCameraState(state);
+
+  /// Sends a live OBS tally update (`tally`) across the control channel.
+  bool sendTally(LiveTallyMessage tally) => _dataChannelHelper.sendTally(tally);
 
   /// Reorders payload types on `m=video` to prioritize hardware H.264.
   String preferH264Codec(String sdp) => prioritizeH264InSdp(sdp);

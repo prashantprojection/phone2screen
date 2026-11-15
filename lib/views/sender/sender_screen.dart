@@ -120,8 +120,17 @@ class _SenderScreenState extends ConsumerState<SenderScreen> {
   Widget _buildLiveView(BuildContext context, SessionState session, AppSettings settings, StreamConfig config) {
     final peerName = session.connectedPeerName ?? session.activeEndpoint?.deviceName ?? 'Receiver';
     final showOledTally = settings.ecoDimPreview && session.phase == .streaming;
-    final statusColor = session.phase == .streaming ? AppColors.accentGreen : AppColors.accentOrange;
-    final statusLabel = '${session.phase == .streaming ? "Live" : "Connecting"} • $peerName';
+    final (statusColor, statusPrefix) = session.phase != .streaming
+        ? (
+            AppColors.accentOrange,
+            session.phase == .reconnecting ? 'Reconnecting' : 'Connecting',
+          )
+        : switch (session.liveTally.state) {
+            .preview => (AppColors.accentGreen, 'Preview'),
+            .standby => (AppColors.cyanAccent, 'Standby'),
+            .program || .off => (AppColors.accentRed, 'ON AIR'),
+          };
+    final statusLabel = '$statusPrefix • $peerName';
 
     return ColoredBox(
       color: Colors.black,
@@ -135,6 +144,8 @@ class _SenderScreenState extends ConsumerState<SenderScreen> {
                     phase: session.phase,
                     telemetry: session.telemetry,
                     streamConfig: config,
+                    tallyState: session.liveTally.state,
+                    tallyScene: session.liveTally.sceneName,
                     onShowPreview: () => ref.read(appSettingsProvider.notifier).setEcoDimPreview(false),
                   )
                 : VideoStageWidget(

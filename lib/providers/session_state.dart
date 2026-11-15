@@ -3,6 +3,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../models/camera_control_state.dart';
 import '../models/clipboard_item.dart';
+import '../models/obs_sync_state.dart';
 import '../models/session_phase.dart';
 import '../models/signaling_data.dart';
 import '../models/stream_telemetry.dart';
@@ -21,6 +22,7 @@ class const SessionState({
   final bool isMicMuted = false,
   final bool isTorchOn = false,
   final RemoteCameraState remoteCameraState = const RemoteCameraState(),
+  final LiveTallyMessage liveTally = const LiveTallyMessage(state: .program),
   final List<ClipboardItem> clipboardHistory = const [],
   final String? errorMessage,
 }) {
@@ -31,6 +33,7 @@ class const SessionState({
     String? connectedPeerName,
     bool isWebBroadcast = false,
     RemoteCameraState remoteCameraState = const RemoteCameraState(),
+    LiveTallyMessage? liveTally,
     String? errorMessage,
   }) {
     return SessionState(
@@ -39,6 +42,7 @@ class const SessionState({
       connectedPeerName: connectedPeerName,
       isWebBroadcast: isWebBroadcast,
       remoteCameraState: remoteCameraState,
+      liveTally: liveTally ?? const LiveTallyMessage(state: .program),
       clipboardHistory: clipboardHistory,
       errorMessage: errorMessage,
     );
@@ -56,6 +60,7 @@ class const SessionState({
     bool? isMicMuted,
     bool? isTorchOn,
     RemoteCameraState? remoteCameraState,
+    LiveTallyMessage? liveTally,
     List<ClipboardItem>? clipboardHistory,
     String? errorMessage,
     bool clearEndpoint = false,
@@ -81,6 +86,7 @@ class const SessionState({
       isMicMuted: isMicMuted ?? this.isMicMuted,
       isTorchOn: isTorchOn ?? this.isTorchOn,
       remoteCameraState: remoteCameraState ?? this.remoteCameraState,
+      liveTally: liveTally ?? this.liveTally,
       clipboardHistory: clipboardHistory ?? this.clipboardHistory,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );

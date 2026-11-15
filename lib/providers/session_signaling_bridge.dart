@@ -5,6 +5,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../models/camera_control_state.dart';
 import '../models/clipboard_item.dart';
+import '../models/obs_sync_state.dart';
 import '../models/signaling_message.dart';
 import '../services/signaling/signaling_client_service.dart';
 import '../services/signaling/signaling_server_service.dart';
@@ -19,6 +20,7 @@ class SessionSignalingBridge {
   final List<StreamSubscription<dynamic>> _sessionSubs = [];
   final List<StreamSubscription<dynamic>> _webrtcSubs = [];
   Future<void> Function(RemoteCameraCommand cmd)? _onCameraCommand;
+  LiveTallyMessage Function()? _readHostTally;
   bool _webrtcWired = false;
 
   /// Subscribes once to [WebRtcSessionService] broadcast streams.
@@ -27,8 +29,10 @@ class SessionSignalingBridge {
     required Future<void> Function(String? errorMessage) onHostPeerFailed,
     required Future<void> Function(String? errorMessage) onSenderPeerFailed,
     Future<void> Function(RemoteCameraCommand cmd)? onCameraCommand,
+    LiveTallyMessage Function()? readHostTally,
   }) {
     _onCameraCommand = onCameraCommand ?? _onCameraCommand;
+    _readHostTally = readHostTally ?? _readHostTally;
     if (_webrtcWired) return;
     _webrtcWired = true;
     final ref = ctx.sessionRef;
@@ -85,6 +89,11 @@ class SessionSignalingBridge {
         }
       }),
       ctx.webrtc.incomingClipboard.listen((item) => _onClipboard(ctx, item)),
+      ctx.webrtc.incomingTally.listen((tally) {
+        if (ctx.isNotifierMounted && !ctx.isHosting) {
+          ctx.currentState = ctx.currentState.copyWith(liveTally: tally);
+        }
+      }),
       ..._buildCameraControlSubs(ctx),
     ]);
   }
@@ -110,6 +119,9 @@ class SessionSignalingBridge {
       // Publish initial lens, torch, mute, and hardware support on channel open.
       final isBroadcaster = !ctx.isHosting || ctx.currentState.isWebBroadcast;
       if (isBroadcaster) ctx.publishCurrentCameraState();
+      if (ctx.isHosting && !ctx.currentState.isWebBroadcast && _readHostTally != null) {
+        ctx.webrtc.sendTally(_readHostTally!());
+      }
     }),
   ];
 

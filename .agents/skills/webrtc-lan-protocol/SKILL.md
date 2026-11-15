@@ -1,9 +1,9 @@
 ---
 name: webrtc-lan-protocol
-description: Specification for Phone2Screen v0.2 LAN & USB NIC ranking, UDP 41234 P2S_V1 discovery, multi-peer /ws SignalingMessage JSON handshake, early ICE buffering, phone2screen-control DataChannel (ping/pong, clipboard, cam_ctrl/cam_state), GET / Browser Web Companion, and GET /obs OBS Clean Feed.
+description: Specification for Phone2Screen v0.3 LAN & USB NIC ranking, ADB reverse + GET /p2s-info discovery, UDP 41234 P2S_V1 discovery, multi-peer /ws SignalingMessage JSON handshake, early ICE buffering, phone2screen-control DataChannel (ping/pong, clipboard, cam_ctrl/cam_state, tally), OBS WebSocket v5 sync, GET / Browser Web Companion, and GET /obs?delay=<ms> OBS Clean Feed.
 ---
 
-# WebRTC, USB & LAN Signaling Protocol (v0.2)
+# WebRTC, USB & LAN Signaling Protocol (v0.3)
 
 Phone2Screen operates completely offline on a local network (USB tethering, ADB reverse loopback, Wi-Fi, Ethernet, or mobile hotspot) without cloud relay servers.
 
@@ -18,7 +18,10 @@ Phone2Screen operates completely offline on a local network (USB tethering, ADB 
   - Physical Ethernet (`eth*`, `ethernet`, `en*`): `+250`
   - RFC1918 subnet bonus: `192.168.*` `+120`, `10.*` `+100`, `172.16-31.*` `+90`
   - Virtual/tunnel adapters: **`-1000`**
-- **ADB USB Loopback**: Senders can also connect directly to `127.0.0.1` via the **USB / ADB** quick action when `adb reverse tcp:8080 tcp:8080` is active.
+- **Zero-Config ADB USB Auto-Bridge (`UsbBridgeService` & `GET /p2s-info`)**:
+  - Desktop hosts run `adb reverse tcp:<port> tcp:<port>` across active primary and secondary camera ports (`SessionHostFlow` & `MultiCamNotifier`).
+  - `GET /p2s-info` (`StreamConstants.usbInfoPath`) returns JSON `{ "magic": "P2S_V1", "ip": "127.0.0.1", "port": <httpPort>, "httpsPort"?: <httpsPort>, "sessionId", "deviceName", "requiresPin", "mode" }`.
+  - Senders probe `http://127.0.0.1:8080..8083/p2s-info` directly (`findProxy = 'DIRECT'`, guarded under `FLUTTER_TEST` unless `allowInTestOverride: true`) and list `isUsbLoopback` peers first in `allDiscoveredPeersProvider`, or connect manually via **USB / ADB**.
 
 ## 2. UDP LAN Discovery (`41234`, `P2S_V1`)
 
@@ -68,12 +71,12 @@ Phone2Screen operates completely offline on a local network (USB tethering, ADB 
     ```json
     {
       "kind": "cam_ctrl",
-      "cmd": "flip | torch | micMute | zoom | exposure | focusLock",
+      "cmd": "flip | torch | micMute | zoom | exposure | focusLock | voiceMode",
       "value": 2.0,
       "enabled": true
     }
     ```
-    Parsed safely via `RemoteCameraCommand.tryFromJson`; executed via `CameraControlService.applyCommand`.
+    Parsed safely via `RemoteCameraCommand.tryFromJson`; executed via `CameraControlService.applyCommand`. `voiceMode` toggles live mic DSP (`echoCancellation`, `noiseSuppression`, `autoGainControl`).
   - `cam_state` (Sender -> Receiver, emitted on open and after changes):
     ```json
     {
@@ -86,15 +89,25 @@ Phone2Screen operates completely offline on a local network (USB tethering, ADB 
       "maxZoom": 5.0,
       "exposureOffset": 0.0,
       "focusLocked": false,
-      "controlsSupported": true
+      "controlsSupported": true,
+      "voiceClean": true
     }
     ```
     Parsed safely with finite/clamped bounds via `RemoteCameraState.tryFromJson`.
+  - `tally` (Receiver -> Sender, emitted on control channel open, OBS scene/item updates, or multi-cam focus changes):
+    ```json
+    {
+      "kind": "tally",
+      "state": "program | preview | standby | off",
+      "scene": "Scene 1"
+    }
+    ```
+    Parsed via `LiveTallyMessage.tryFromJson`; driven by `ObsSyncNotifier` (`ObsWebSocketService`, OBS WebSocket v5 `rpcVersion: 1` with pure-Dart SHA-256 `computeObsWebSocketAuth`) or local `MultiCamNotifier` slot focus when OBS is disconnected.
 
 ## 6. Browser Web Companion (`GET /`) & OBS Clean Feed (`GET /obs`)
 
 - `GET /` (`buildWebCompanionHtml`): Self-contained HTML5/JS companion supporting `sendToReceiver` (Receiver hosts `http://<ip>:8080` + companion TLS `https://<ip>:8443` for browser `getUserMedia`/`getDisplayMedia`) and `viewSenderStream` (Sender hosts plain `http://<ip>:8080` for live `<video autoplay playsinline>`). Includes Fit/Fill, Rotate 90°, Mirror, RTT stats toggle, clipboard drawer, and browser `cam_ctrl`/`cam_state` (`flip` + `micMute`).
 - `GET /obs` (`buildObsCleanFeedHtml`, `StreamConstants.obsCleanFeedPath`): Zero-UI full-bleed HTML5/WebRTC page designed for **OBS Studio Browser Source**:
   - `cursor: none`, `<video id="v" autoplay playsinline>`, transparent canvas by default.
-  - Supported URL query parameters: `?pin=<digits>`, `?fit=cover`, `?mirror=1` (or `true`), `?bg=black`.
+  - Supported URL query parameters: `?pin=<digits>`, `?fit=cover`, `?mirror=1` (or `true`), `?bg=black`, `?delay=<ms>` (clamped `0..1000`, attaches Web Audio `AudioContext` + `DelayNode` with `v.muted = true` to avoid dry bleed).
   - Uses H.264 SDP priority (`preferH264`), early ICE buffering, DataChannel `ping -> pong` heartbeat replies, and automatic **1500 ms** reconnect (`scheduleReconnect`) on disconnect/error.

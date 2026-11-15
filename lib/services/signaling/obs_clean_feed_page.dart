@@ -49,6 +49,7 @@ html.bg-black,body.bg-black{background:#000}
   const CFG = __CFG_JSON__;
   const q = new URLSearchParams(location.search);
   const pin = (q.get('pin') || '').trim();
+  const delayMs = Math.min(1000, Math.max(0, parseInt(q.get('delay') || '0', 10) || 0));
   const v = document.getElementById('v'), dot = document.getElementById('dot');
   if (q.get('bg') === 'black'){ document.documentElement.classList.add('bg-black'); document.body.classList.add('bg-black'); }
   if (q.get('fit') === 'cover') v.classList.add('fit-cover');
@@ -56,6 +57,7 @@ html.bg-black,body.bg-black{background:#000}
 
   let ws = null, pc = null, dc = null, remoteDescSet = false, earlyIce = [];
   let reconTimer = null, dead = false, playAttempted = false;
+  let audioCtx = null, audioSrcStream = null;
   const iceCfg = {iceServers: [{urls: 'stun:stun.l.google.com:19302'}]};
   const sendSig = (type, payload) => {
     if (ws && ws.readyState === 1) ws.send(JSON.stringify({type, sessionId: CFG.sessionId, payload: payload || {}}));
@@ -90,9 +92,40 @@ html.bg-black,body.bg-black{background:#000}
     }
   }
 
+  function closeAudioDelay(){
+    audioSrcStream = null;
+    if (audioCtx){ try{ audioCtx.close(); }catch(_){} audioCtx = null; }
+  }
+
+  function setupAudioDelay(){
+    if (delayMs <= 0 || !v.srcObject) return;
+    const stream = v.srcObject;
+    if (!stream.getAudioTracks || !stream.getAudioTracks().length) return;
+    if (audioCtx && audioSrcStream === stream){
+      if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+      return;
+    }
+    closeAudioDelay();
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    try {
+      const ctx = new Ctx();
+      const src = ctx.createMediaStreamSource(v.srcObject);
+      const delay = typeof DelayNode === 'function' ? new DelayNode(ctx, {maxDelayTime: 1.0}) : ctx.createDelay(1.0);
+      delay.delayTime.value = delayMs / 1000;
+      src.connect(delay);
+      delay.connect(ctx.destination);
+      audioCtx = ctx;
+      audioSrcStream = stream;
+      v.muted = true;
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    } catch (_) {}
+  }
+
   function tryPlay(){
     if (!v.srcObject) return;
     if (!playAttempted){ playAttempted = true; v.muted = false; }
+    setupAudioDelay();
     if (!v.paused) return;
     const p = v.play();
     if (p && p.then){
@@ -111,6 +144,7 @@ html.bg-black,body.bg-black{background:#000}
   }
 
   function cleanup(retry){
+    closeAudioDelay();
     if (dc){ try{ dc.close(); }catch(_){} dc = null; }
     if (pc){ pc.onconnectionstatechange = null; pc.onicecandidate = null; try{ pc.close(); }catch(_){} pc = null; }
     if (ws){ ws.onopen = null; ws.onmessage = null; ws.onerror = null; ws.onclose = null; try{ ws.close(); }catch(_){} ws = null; }

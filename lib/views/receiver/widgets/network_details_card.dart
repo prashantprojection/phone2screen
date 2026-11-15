@@ -19,6 +19,7 @@ class const NetworkDetailsCard({
     final colors = theme.colorScheme;
     final interfacesAsync = ref.watch(networkInterfacesProvider);
     final selectedIp = ref.watch(selectedIpProvider);
+    final usbStatus = ref.watch(usbBridgeStatusProvider).value;
     final ep = endpoint;
     final phoneBrowserUrl = ep?.httpsBrowserUrl ?? ep?.browserUrl;
     final interfaces = interfacesAsync.asData?.value ?? const <NetworkInterfaceInfo>[];
@@ -28,7 +29,24 @@ class const NetworkDetailsCard({
       crossAxisAlignment: .stretch,
       spacing: 12,
       children: [
-        if (activeNic?.isUsbTethered == true) _UsbLowLatencyBanner(interfaceName: activeNic!.name),
+        if (activeNic?.isUsbTethered == true)
+          _UsbStatusBanner(
+            icon: Icons.usb_rounded,
+            color: AppColors.accentGreen,
+            text: 'USB Wired • Ultra-Low Latency (${activeNic!.name})',
+          ),
+        if (usbStatus != null && usbStatus.hasActiveTunnel)
+          _UsbStatusBanner(
+            icon: Icons.cable_rounded,
+            color: AppColors.accentGreen,
+            text: 'USB Auto-Bridge Active • Port(s) ${usbStatus.forwardedPorts.join(', ')} ready',
+          ),
+        if (usbStatus != null && usbStatus.unauthorizedSerials.isNotEmpty)
+          const _UsbStatusBanner(
+            icon: Icons.usb_rounded,
+            color: AppColors.accentOrange,
+            text: 'Phone connected on USB — tap "Allow USB debugging" to auto-bridge',
+          ),
         Card(
           child: Padding(
             padding: const .all(20),
@@ -177,25 +195,28 @@ class const NetworkDetailsCard({
   }
 }
 
-class const _UsbLowLatencyBanner({required final String interfaceName}) extends StatelessWidget {
+class const _UsbStatusBanner({
+  required final IconData icon,
+  required final Color color,
+  required final String text,
+}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const .symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.accentGreen.withValues(alpha: 0.14),
+        color: color.withValues(alpha: 0.14),
         borderRadius: .circular(14),
-        border: Border.all(color: AppColors.accentGreen.withValues(alpha: 0.45)),
+        border: Border.all(color: color.withValues(alpha: 0.45)),
       ),
       child: Row(
         spacing: 8,
         children: [
-          const Icon(Icons.usb_rounded, size: 18, color: AppColors.accentGreen),
+          Icon(icon, size: 18, color: color),
           Expanded(
             child: Text(
-              'USB Wired • Ultra-Low Latency ($interfaceName)',
-              overflow: .ellipsis,
-              style: const TextStyle(color: AppColors.accentGreen, fontSize: 13, fontWeight: .w700),
+              text,
+              style: TextStyle(color: color, fontSize: 13, fontWeight: .w700),
             ),
           ),
         ],

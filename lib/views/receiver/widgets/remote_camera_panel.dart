@@ -8,6 +8,7 @@ import '../../../models/viewer_display_config.dart';
 import '../../../providers/multi_cam_provider.dart';
 import '../../../providers/session_provider.dart';
 import '../../../providers/settings_provider.dart';
+import 'studio_look_audio_section.dart';
 
 /// Studio modal for remote phone camera control, aspect framing, and GPU color.
 class const RemoteCameraPanel({super.key}) extends ConsumerStatefulWidget {
@@ -16,16 +17,12 @@ class const RemoteCameraPanel({super.key}) extends ConsumerStatefulWidget {
   static Future<void> show(BuildContext context) {
     if (context.isCompact) {
       return showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
+        context: context, isScrollControlled: true, useSafeArea: true,
         builder: (_) => const RemoteCameraPanel(),
       );
     }
     return showGeneralDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Dismiss',
+      context: context, barrierDismissible: true, barrierLabel: 'Dismiss',
       barrierColor: Colors.black.withValues(alpha: 0.22),
       transitionDuration: const Duration(milliseconds: 180),
       pageBuilder: (dialogContext, _, _) {
@@ -38,13 +35,9 @@ class const RemoteCameraPanel({super.key}) extends ConsumerStatefulWidget {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 432),
                 child: Material(
-                  color: colors.surface,
-                  elevation: 16,
+                  color: colors.surface, elevation: 16,
                   shadowColor: Colors.black.withValues(alpha: 0.42),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: .circular(22),
-                    side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.8)),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: .circular(22), side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.8))),
                   clipBehavior: .antiAlias,
                   child: const RemoteCameraPanel(),
                 ),
@@ -54,11 +47,7 @@ class const RemoteCameraPanel({super.key}) extends ConsumerStatefulWidget {
         );
       },
       transitionBuilder: (_, animation, _, child) {
-        final curved = CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutCubic,
-          reverseCurve: Curves.easeInCubic,
-        );
+        final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
         return SlideTransition(
           position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(curved),
           child: FadeTransition(opacity: curved, child: child),
@@ -129,23 +118,25 @@ class _RemoteCameraPanelState extends ConsumerState<RemoteCameraPanel> {
                 visualDensity: .compact,
                 materialTapTargetSize: .shrinkWrap,
                 chipTheme: theme.chipTheme.copyWith(padding: const .symmetric(horizontal: 6)),
-              ),
-              child: SliderTheme(
-                data: theme.sliderTheme.copyWith(
+                sliderTheme: theme.sliderTheme.copyWith(
                   trackHeight: 3,
                   thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
                   overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
                 ),
-                child: SingleChildScrollView(
+              ),
+              child: SingleChildScrollView(
                   padding: const .fromLTRB(16, 10, 16, 16),
                   child: Column(
                     crossAxisAlignment: .stretch,
                     spacing: 10,
                     children: [
-                      _sectionBox(
-                        colors,
+                      StudioSectionBox(
+                        colors: colors,
                         children: [
-                          _sectionTitle(theme, 'Remote Phone Camera Rig', canHw ? 'Controls phone lens, torch, zoom, and exposure live' : 'Hardware lens controls unavailable for screen/browser source'),
+                          StudioSectionTitle(
+                            title: 'Remote Phone Camera Rig',
+                            subtitle: canHw ? 'Controls phone lens, torch, zoom, and exposure live' : 'Hardware lens controls unavailable for screen/browser source',
+                          ),
                           Wrap(
                             spacing: 6,
                             runSpacing: 6,
@@ -172,30 +163,28 @@ class _RemoteCameraPanelState extends ConsumerState<RemoteCameraPanel> {
                                 ),
                             ],
                           ),
-                          _slider(
-                            theme, 'Zoom', '${zoomVal.toStringAsFixed(1)}x', zoomVal, camState.minZoom, maxZoom,
+                          StudioSliderRow(
+                            label: 'Zoom', valueText: '${zoomVal.toStringAsFixed(1)}x', value: zoomVal, min: camState.minZoom, max: maxZoom,
                             onChanged: canZoom ? (v) { setState(() => _pendingZoom = v); sendCmd(RemoteCameraCommand(command: .zoom, value: v)); } : null,
-                            onEnd: (_) => setState(() => _pendingZoom = null),
+                            onChangeEnd: (_) => setState(() => _pendingZoom = null),
                           ),
-                          _slider(
-                            theme, 'Exposure (EV)', '${evVal >= 0 ? '+' : ''}${evVal.toStringAsFixed(1)} EV', evVal, -2.0, 2.0,
-                            divisions: 16,
+                          StudioSliderRow(
+                            label: 'Exposure (EV)', valueText: '${evVal >= 0 ? '+' : ''}${evVal.toStringAsFixed(1)} EV', value: evVal, min: -2.0, max: 2.0, divisions: 16,
                             onChanged: canHw ? (v) { setState(() => _pendingExposure = v); sendCmd(RemoteCameraCommand(command: .exposure, value: v)); } : null,
-                            onEnd: (_) => setState(() => _pendingExposure = null),
+                            onChangeEnd: (_) => setState(() => _pendingExposure = null),
                           ),
                         ],
                       ),
-                      _sectionBox(
-                        colors,
+                      StudioSectionBox(
+                        colors: colors,
                         children: [
-                          _sectionTitle(
-                            theme,
-                            'Studio Framing & GPU Color',
-                            'Aspect crop, Rule-of-Thirds grid, pan & look',
+                          StudioSectionTitle(
+                            title: 'Studio Framing & GPU Color',
+                            subtitle: 'Aspect crop, Rule-of-Thirds grid, pan & look',
                             trailing: TextButton.icon(
                               onPressed: () => isPrimary
                                   ? primaryNotifier.resetFramingAndColor()
-                                  : updateSecondary((c) => c.copyWith(aspectPreset: .free, digitalZoom: 1.0, panX: 0.0, panY: 0.0, brightness: 0.0, contrast: 1.0, saturation: 1.0)),
+                                  : updateSecondary((c) => c.copyWith(aspectPreset: .free, digitalZoom: 1.0, panX: 0.0, panY: 0.0, brightness: 0.0, contrast: 1.0, saturation: 1.0, lookPreset: .natural, vignette: false)),
                               style: TextButton.styleFrom(padding: const .symmetric(horizontal: 8, vertical: 4)),
                               icon: const Icon(Icons.restart_alt_rounded, size: 16),
                               label: const Text('Reset Studio Look'),
@@ -225,15 +214,20 @@ class _RemoteCameraPanelState extends ConsumerState<RemoteCameraPanel> {
                             ],
                           ),
                           for (final s in framingSliders)
-                            _slider(theme, s.$1, s.$2, s.$3, s.$4, s.$5, onChanged: s.$6),
+                            StudioSliderRow(label: s.$1, valueText: s.$2, value: s.$3, min: s.$4, max: s.$5, onChanged: s.$6),
                         ],
+                      ),
+                      StudioLookAudioSection(
+                        isPrimary: isPrimary,
+                        display: display,
+                        onSecondaryDisplayUpdate: updateSecondary,
+                        onSendVoiceMode: (clean) => sendCmd(RemoteCameraCommand(command: .voiceMode, enabled: clean)),
                       ),
                     ],
                   ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -277,40 +271,9 @@ class _RemoteCameraPanelState extends ConsumerState<RemoteCameraPanel> {
   }
 
   void _selectTarget(String? id) {
-    setState(() {
-      _pendingZoom = null;
-      _pendingExposure = null;
-    });
+    setState(() { _pendingZoom = null; _pendingExposure = null; });
     ref.read(multiCamProvider.notifier).selectSlot(id);
   }
-
-  Widget _sectionBox(ColorScheme colors, {required List<Widget> children}) => Container(
-    padding: const .all(12),
-    decoration: BoxDecoration(
-      color: colors.surfaceContainer.withValues(alpha: 0.55),
-      borderRadius: .circular(16),
-      border: Border.all(color: colors.outlineVariant.withValues(alpha: 0.55)),
-    ),
-    child: Column(crossAxisAlignment: .stretch, spacing: 8, children: children),
-  );
-
-  Widget _sectionTitle(ThemeData theme, String title, String subtitle, {Widget? trailing}) => Column(
-    crossAxisAlignment: .start,
-    spacing: 2,
-    children: [
-      if (trailing != null)
-        Row(
-          spacing: 8,
-          children: [
-            Expanded(child: Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: .w700))),
-            trailing,
-          ],
-        )
-      else
-        Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: .w700)),
-      Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-    ],
-  );
 
   Widget _rigChip(ColorScheme colors, IconData icon, String label, bool active, bool enabled, VoidCallback onTap, {Color? accent}) {
     final tone = active ? (accent ?? colors.primary) : null;
@@ -323,21 +286,4 @@ class _RemoteCameraPanelState extends ConsumerState<RemoteCameraPanel> {
       onSelected: enabled ? (_) => onTap() : null,
     );
   }
-
-  Widget _slider(ThemeData theme, String label, String text, double value, double min, double max, {int? divisions, ValueChanged<double>? onChanged, ValueChanged<double>? onEnd}) => Column(
-    mainAxisSize: .min,
-    children: [
-      Row(
-        mainAxisAlignment: .spaceBetween,
-        children: [
-          Text(label, style: theme.textTheme.bodySmall?.copyWith(fontWeight: .w600)),
-          Text(text, style: theme.textTheme.labelMedium?.copyWith(fontFeatures: const [FontFeature.tabularFigures()])),
-        ],
-      ),
-      SizedBox(
-        height: 28,
-        child: Slider(value: value, min: min, max: max, divisions: divisions, onChanged: onChanged, onChangeEnd: onEnd),
-      ),
-    ],
-  );
 }

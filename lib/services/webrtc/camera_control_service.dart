@@ -109,6 +109,19 @@ class CameraControlService {
         return await setFocusLocked(track, lock)
             ? current.copyWith(focusLocked: lock)
             : current;
+      case .voiceMode:
+        final clean = cmd.enabled ?? !current.voiceClean;
+        final audioTrack = stream?.getAudioTracks().firstOrNull;
+        try {
+          await audioTrack?.applyConstraints({
+            'echoCancellation': clean,
+            'noiseSuppression': clean,
+            'autoGainControl': clean,
+          });
+        } catch (_) {
+          // Best-effort DSP toggle; unsupported tracks keep desired mode flag.
+        }
+        return current.copyWith(voiceClean: clean);
     }
   }
 }

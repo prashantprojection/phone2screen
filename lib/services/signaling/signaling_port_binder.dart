@@ -67,8 +67,9 @@ Future<HttpServer?> tryBindHttpsPortRange(int? preferredHttpsPort) async {
   return null;
 }
 
-/// Serves static HTTP routes (`GET /health`, `GET /obs`, `GET /`, or 404) for
-/// the signaling server's companion and OBS Browser Source pages.
+/// Serves static HTTP routes (`GET /health`, `GET /p2s-info`, `GET /obs`,
+/// `GET /`, or 404) for the signaling server's USB probe, companion, and OBS
+/// Browser Source pages.
 Future<void> serveSignalingHttpRequest(
   HttpRequest request, {
   required String sessionId,
@@ -90,6 +91,25 @@ Future<void> serveSignalingHttpRequest(
           'deviceName': deviceName,
           'requiresPin': requiresPin,
           'httpsPort': httpsPort,
+          'mode': mode.name,
+        }),
+      );
+    await request.response.close();
+    return;
+  }
+  if (path == StreamConstants.usbInfoPath && request.method == 'GET') {
+    request.response
+      ..statusCode = HttpStatus.ok
+      ..headers.contentType = ContentType.json
+      ..write(
+        jsonEncode({
+          'magic': StreamConstants.discoveryMagic,
+          'ip': '127.0.0.1',
+          'port': httpPort,
+          'httpsPort': ?httpsPort,
+          'sessionId': sessionId,
+          'deviceName': deviceName,
+          'requiresPin': requiresPin,
           'mode': mode.name,
         }),
       );

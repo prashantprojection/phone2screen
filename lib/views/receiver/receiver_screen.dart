@@ -13,6 +13,7 @@ import '../../../providers/session_provider.dart';
 import '../../../providers/settings_provider.dart';
 import '../shared/error_banner.dart';
 import 'widgets/network_details_card.dart';
+import 'widgets/obs_virtual_cam_sheet.dart';
 import 'widgets/qr_pairing_card.dart';
 import 'widgets/receiver_streaming_stage.dart';
 
@@ -153,31 +154,29 @@ class const _LobbyHeader({
               ],
             );
             if (!showAction) return titleBlock;
-            final actionButton = FilledButton.tonalIcon(
-              onPressed: canOpen ? () => notifier.openCameraWindow() : null,
-              style: FilledButton.styleFrom(
-                visualDensity: .compact,
-                shape: const StadiumBorder(),
-                padding: const .symmetric(horizontal: 14, vertical: 10),
-              ),
-              icon: Icon(Icons.open_in_new_rounded, size: 17, color: colors.primary),
-              label: const Text('+ Open Camera Window'),
+            final actionWrap = Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: .center,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => ObsVirtualCamSheet.show(context),
+                  style: OutlinedButton.styleFrom(visualDensity: .compact, shape: const StadiumBorder(), padding: const .symmetric(horizontal: 14, vertical: 10)),
+                  icon: const Icon(Icons.videocam_rounded, size: 17),
+                  label: const Text('Virtual Cam & OBS'),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: canOpen ? () => notifier.openCameraWindow() : null,
+                  style: FilledButton.styleFrom(visualDensity: .compact, shape: const StadiumBorder(), padding: const .symmetric(horizontal: 14, vertical: 10)),
+                  icon: Icon(Icons.open_in_new_rounded, size: 17, color: colors.primary),
+                  label: const Text('+ Open Camera Window'),
+                ),
+              ],
             );
-            if (constraints.maxWidth >= 680) {
-              return Row(
-                crossAxisAlignment: .center,
-                spacing: 16,
-                children: [
-                  Expanded(child: titleBlock),
-                  actionButton,
-                ],
-              );
+            if (constraints.maxWidth >= 820) {
+              return Row(crossAxisAlignment: .center, spacing: 16, children: [Expanded(child: titleBlock), actionWrap]);
             }
-            return Column(
-              crossAxisAlignment: .start,
-              spacing: 10,
-              children: [titleBlock, actionButton],
-            );
+            return Column(crossAxisAlignment: .start, spacing: 10, children: [titleBlock, actionWrap]);
           },
         ),
         if (hasChips)

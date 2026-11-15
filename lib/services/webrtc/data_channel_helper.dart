@@ -5,9 +5,10 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../../models/camera_control_state.dart';
 import '../../models/clipboard_item.dart';
+import '../../models/obs_sync_state.dart';
 
 /// Manages the `phone2screen-control` WebRTC DataChannel for `ping`/`pong` RTT,
-/// bidirectional clipboard synchronization, and remote camera control frames.
+/// bidirectional clipboard synchronization, remote camera control, and tally.
 class DataChannelHelper {
   final StreamController<ClipboardItem> _clipboardController =
       StreamController<ClipboardItem>.broadcast();
@@ -15,6 +16,8 @@ class DataChannelHelper {
       StreamController<RemoteCameraCommand>.broadcast();
   final StreamController<RemoteCameraState> _cameraStateController =
       StreamController<RemoteCameraState>.broadcast();
+  final StreamController<LiveTallyMessage> _tallyController =
+      StreamController<LiveTallyMessage>.broadcast();
   final StreamController<void> _channelOpenController =
       StreamController<void>.broadcast();
 
@@ -33,6 +36,9 @@ class DataChannelHelper {
   /// Stream of authoritative camera hardware state (`cam_state`) snapshots.
   Stream<RemoteCameraState> get incomingCameraStates =>
       _cameraStateController.stream;
+
+  /// Stream of live OBS tally updates (`tally`) sent by the Receiver.
+  Stream<LiveTallyMessage> get incomingTally => _tallyController.stream;
 
   /// Emits when the control DataChannel opens so peers can push initial state.
   Stream<void> get onChannelOpen => _channelOpenController.stream;
@@ -89,6 +95,9 @@ class DataChannelHelper {
   /// Broadcasts authoritative camera hardware state (`cam_state`) to Receiver.
   bool sendCameraState(RemoteCameraState state) => _sendJson(state.toJson());
 
+  /// Sends a live OBS tally status (`tally`) across the control channel.
+  bool sendTally(LiveTallyMessage tally) => _sendJson(tally.toJson());
+
   void _handleMessage(RTCDataChannelMessage message) {
     if (message.isBinary) return;
     try {
@@ -125,6 +134,9 @@ class DataChannelHelper {
         // Sync Sender hardware state back to Receiver so HUD controls stay truthful.
         final state = RemoteCameraState.tryFromJson(decoded);
         if (state != null && !_disposed) _cameraStateController.add(state);
+      } else if (kind == 'tally') {
+        final tally = LiveTallyMessage.tryFromJson(decoded);
+        if (tally != null && !_disposed) _tallyController.add(tally);
       }
     } catch (_) {
       // Ignore malformed DataChannel payloads rather than dropping the stream.
@@ -169,6 +181,7 @@ class DataChannelHelper {
     await _clipboardController.close();
     await _cameraCmdController.close();
     await _cameraStateController.close();
+    await _tallyController.close();
     await _channelOpenController.close();
   }
 }

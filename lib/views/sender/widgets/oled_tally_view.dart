@@ -3,11 +3,12 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../models/obs_sync_state.dart';
 import '../../../models/session_phase.dart';
 import '../../../models/stream_config.dart';
 import '../../../models/stream_telemetry.dart';
 
-/// True-black `#000000` OLED burn-in-safe ON AIR tally screen shown while
+/// True-black `#000000` OLED burn-in-safe tally screen shown while
 /// Eco Dim Preview is active during streaming.
 class const OledTallyView({
   super.key,
@@ -16,6 +17,8 @@ class const OledTallyView({
   required final StreamTelemetry telemetry,
   required final StreamConfig streamConfig,
   required final VoidCallback onShowPreview,
+  final TallyState tallyState = .program,
+  final String? tallyScene,
 }) extends StatefulWidget {
   @override
   State<OledTallyView> createState() => _OledTallyViewState();
@@ -54,7 +57,15 @@ class _OledTallyViewState extends State<OledTallyView> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isLive = widget.phase == .streaming;
-    final tallyColor = isLive ? AppColors.accentRed : AppColors.accentOrange;
+    final (tallyColor, badgeText) = !isLive
+        ? (AppColors.accentOrange, 'CONNECTING')
+        : switch (widget.tallyState) {
+            .preview => (AppColors.accentGreen, 'PREVIEW'),
+            .standby => (AppColors.cyanAccent, 'STANDBY'),
+            .program || .off => (AppColors.accentRed, 'ON AIR'),
+          };
+    final scene = widget.tallyScene?.trim();
+    final showScene = isLive && scene != null && scene.isNotEmpty;
     final durationText = _formatDuration(widget.telemetry.connectedDuration);
     final summary = _formatStreamSummary(widget.streamConfig);
 
@@ -96,7 +107,7 @@ class _OledTallyViewState extends State<OledTallyView> {
                           ),
                         ),
                         Text(
-                          isLive ? 'ON AIR' : 'CONNECTING',
+                          badgeText,
                           style: TextStyle(
                             color: tallyColor.withValues(alpha: 0.88),
                             fontSize: 12,
@@ -107,6 +118,18 @@ class _OledTallyViewState extends State<OledTallyView> {
                       ],
                     ),
                   ),
+                  if (showScene)
+                    Text(
+                      'OBS • $scene',
+                      maxLines: 1,
+                      overflow: .ellipsis,
+                      textAlign: .center,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.56),
+                        fontWeight: .w600,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
                   Text(
                     widget.targetName,
                     maxLines: 1,

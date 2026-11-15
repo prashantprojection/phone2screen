@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import '../../models/camera_rig_preset.dart';
+import '../../models/obs_sync_state.dart';
 import '../../models/shortcut_config.dart';
 import '../../models/signaling_data.dart';
 import '../../models/stream_config.dart';
@@ -124,8 +125,18 @@ class LocalPreferencesService {
     return service;
   }
 
+  static const Set<String> _reservedSnapshotKeys = {
+    'version',
+    'appSettings',
+    'streamConfig',
+    'shortcutConfig',
+    'customPresets',
+    'lastEndpoint',
+  };
+
   final impl.PreferencesStore _store;
   PreferencesSnapshot _snapshot;
+  final Map<String, Map<String, dynamic>> _sections = {};
   Future<void> _writeQueue = Future.value();
 
   PreferencesSnapshot get snapshot => _snapshot;
@@ -136,7 +147,15 @@ class LocalPreferencesService {
       if (raw == null || raw.trim().isEmpty) return _snapshot;
       final decoded = jsonDecode(raw);
       if (decoded is Map) {
-        _snapshot = PreferencesSnapshot.fromJson(Map<String, dynamic>.from(decoded));
+        final root = Map<String, dynamic>.from(decoded);
+        _snapshot = PreferencesSnapshot.fromJson(root);
+        _sections.clear();
+        for (final entry in root.entries) {
+          if (_reservedSnapshotKeys.contains(entry.key)) continue;
+          if (entry.value is Map) {
+            _sections[entry.key] = Map<String, dynamic>.from(entry.value as Map);
+          }
+        }
       }
     } catch (_) {}
     return _snapshot;
@@ -144,7 +163,40 @@ class LocalPreferencesService {
 
   Future<void> save(PreferencesSnapshot next) {
     _snapshot = next;
-    final encoded = jsonEncode(next.toJson());
+    return _persistCurrent();
+  }
+
+  /// Reads a raw JSON preference section stored under [key], or `null` if unset.
+  Map<String, dynamic>? loadJsonSection(String key) {
+    final section = _sections[key];
+    return section == null ? null : Map<String, dynamic>.from(section);
+  }
+
+  /// Stores a raw JSON preference section under [key] and persists to storage.
+  Future<void> saveJsonSection(String key, Map<String, dynamic> value) {
+    if (_reservedSnapshotKeys.contains(key)) return Future.value();
+    _sections[key] = Map<String, dynamic>.from(value);
+    return _persistCurrent();
+  }
+
+  /// Loads persisted OBS WebSocket v5 connection settings (defaults if unset).
+  ObsConnectionConfig loadObsConfig() {
+    final raw = loadJsonSection('obsConfig');
+    return raw == null
+        ? const ObsConnectionConfig()
+        : ObsConnectionConfig.fromJson(raw);
+  }
+
+  /// Saves OBS WebSocket v5 connection settings under `'obsConfig'`.
+  Future<void> saveObsConfig(ObsConnectionConfig config) =>
+      saveJsonSection('obsConfig', config.toJson());
+
+  Future<void> _persistCurrent() {
+    final payload = <String, dynamic>{
+      ..._snapshot.toJson(),
+      for (final entry in _sections.entries) entry.key: entry.value,
+    };
+    final encoded = jsonEncode(payload);
     _writeQueue = _writeQueue.then((_) async {
       try {
         await _store.writeRaw(encoded);
@@ -171,6 +223,7 @@ class LocalPreferencesService {
 
   Future<void> clear() {
     _snapshot = const PreferencesSnapshot();
+    _sections.clear();
     _writeQueue = _writeQueue.then((_) async {
       try {
         await _store.clearRaw();

@@ -1,4 +1,4 @@
-# AGENTS.md — Phone2Screen v0.2
+# AGENTS.md — Phone2Screen v0.3
 
 AI agent context and engineering constraints for **Phone2Screen** (`com.example.phone2screen`), a LAN & USB WebRTC streamer webcam studio (Phone <-> PC Desktop, OBS Studio, and Web Browser).
 
@@ -14,7 +14,7 @@ AI agent context and engineering constraints for **Phone2Screen** (`com.example.
 - **Dart 3.14 Syntax**: Use primary constructors (`class const Foo({required final int bar})`, `const` AFTER `class`, NEVER `const class`; never put `final` on ordinary method params), dot shorthands (`.center`, `const .all(16)`, `.circular(16)`, switch `.streaming => ...`), and `Row`/`Column(spacing:)`.
 - **Zero Code-Gen**: NEVER use `build_runner`, `freezed`, `json_serializable`, `riverpod_generator`, `riverpod_annotation`, `mockito`, `pigeon`, or `*.g.dart`. Write models, JSON serialization, and Riverpod 3 `Notifier` / `NotifierProvider` manually.
 - **Native Adaptive Layout**: Use `ResponsiveContext` (`lib/core/utils/responsive.dart`: `compact` / `medium` / `expanded` via `MediaQuery.sizeOf`) and `LayoutBuilder` — NEVER `flutter_screenutil`.
-- **File Size Cap (`< 350` LOC)**: Every `.dart` and `.kt` file MUST stay strictly under 350 lines.
+- **File Size Cap (`< 350` LOC)**: Every `.dart`, `.kt`, `.cpp`, and `.h` file MUST stay strictly under 350 lines.
 - **Comment Complex Logic**: Keep concise why-comments on H.264 SDP munging, early ICE buffering, Android 14+ `MediaProjection` consent-before-FGS order, UDP `41234` USB/NIC ranking, and DataChannel RTT/`clipboard`/`cam_ctrl` sync.
 
 ## v0.2 Multi-Cam, Multi-Window & Studio Architecture
@@ -32,6 +32,22 @@ AI agent context and engineering constraints for **Phone2Screen** (`com.example.
   - `ViewerDisplayConfig` applies GPU aspect crops, `3x3 Grid`, digital zoom/pan, and BT.709 `colorMatrix`.
   - `LocalPreferencesService` (`local_preferences_io.dart`) persists `AppSettings`, `StreamConfig`, `ShortcutConfig`, custom `CameraRigPreset`s, and `lastEndpoint` as manual JSON.
 - **Android Native**: `MainActivity.kt` (`"phone2screen/projection_service"` + `getFilesDir`) and `MediaProjectionService.kt` (`FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION` started only after `Helper.requestCapturePermission()`).
+
+## v0.3 Streamer Pro Architecture
+
+- **Windows Native `StudioBridge` (`windows/runner/studio_bridge.cpp`/`.h`)**:
+  - Registers `MethodChannel('phone2screen/windows_studio')` wrapped by `WindowsStudioService` (`listVideoCaptureDevices` via DirectShow COM `CLSID_VideoInputDeviceCategory`, `listAudioOutputDevices` via WinMM `waveOutGetDevCapsW`, `setAlwaysOnTop`/`getAlwaysOnTop` via `WS_EX_TOPMOST`).
+  - Compiled under MSVC `/W4 /WX` and `_HAS_EXCEPTIONS=0` (no `try`/`catch`/`throw` or `<comdef.h>`; wrap `<dshow.h>`/`<mmsystem.h>` in `#pragma warning(push, 3)`).
+- **OBS WebSocket v5 & Live Tally Sync (`ObsWebSocketService`, `ObsSyncNotifier`)**:
+  - Pure-Dart FIPS 180-4 SHA-256 (`lib/core/utils/sha256.dart`: `sha256Bytes`, `sha256Hex`, `computeObsWebSocketAuth`) drives OBS WebSocket v5 (`rpcVersion: 1`, `Hello -> Identify -> Identified`, virtual cam toggle, `CreateInput`/`SetInputSettings` for `"Phone2Screen Clean Feed"`, `SetInputAudioSyncOffset` in nanoseconds, and scene/item events).
+  - `ObsSyncNotifier` and `MultiCamNotifier` broadcast `LiveTallyMessage` (`{"kind": "tally", "state": "program|preview|standby|off", "scene": "..."}`) over `phone2screen-control` (`DataChannelHelper`) to `SenderScreen` pills and `OledTallyView`.
+- **Studio Audio Routing & Mic DSP (`AudioRoutingService`, `AudioStudioNotifier`)**:
+  - Enumerates WebRTC `audiooutput` endpoints with Win32 WaveOut fallback, tagging Virtual Audio Cables (`Virtual Mic Ready`), applying `0.0..2.0` stream boost (`Helper.setVolume`), `0..500 ms` lip-sync delay (synced to OBS + `/obs?delay=<ms>` Web Audio `DelayNode`), and live `Voice Clean` vs `Studio Raw` (`cam_ctrl.cmd == "voiceMode"`, `cam_state.voiceClean`).
+- **Zero-Config USB Plug-and-Play (`UsbBridgeService`)**:
+  - Desktop hosts run `adb reverse tcp:<port> tcp:<port>` across primary & secondary camera window ports; Senders probe `http://127.0.0.1:8080..8083/p2s-info` (`GET /p2s-info`) and surface `isUsbLoopback` peers first in `allDiscoveredPeersProvider` (`USB Wired • Zero-Latency`).
+  - Guarded under `FLUTTER_TEST` so real `adb` processes and loopback socket scans never run unless `processRunner` or `allowInTestOverride` is injected.
+- **GPU Studio Look Presets & Vignette (`StudioLookPreset`, `VideoStageWidget`)**:
+  - `ViewerDisplayConfig` composes 4x5 `StudioLookPreset` matrices (`natural`, `streamPunch`, `warmKeylight`, `coolCyber`, `noirBw`) with user brightness/contrast/saturation; `VideoStageWidget` layers an `IgnorePointer` `RadialGradient` overlay when `vignette: true`.
 
 ## Skills & Verification
 

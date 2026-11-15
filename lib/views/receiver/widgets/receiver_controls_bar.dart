@@ -7,11 +7,13 @@ import '../../../core/constants/stream_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../providers/multi_cam_provider.dart';
+import '../../../providers/obs_sync_provider.dart';
 import '../../../providers/platform_provider.dart';
 import '../../../providers/session_provider.dart';
 import '../../../providers/settings_provider.dart';
 import '../../../providers/shortcut_provider.dart';
 import '../../shared/clipboard_sync_sheet.dart';
+import 'obs_virtual_cam_sheet.dart';
 import 'remote_camera_panel.dart';
 
 /// Floating studio control dock for viewport transforms, camera rig, OBS clean view, and disconnect.
@@ -26,6 +28,7 @@ class const ReceiverControlsBar({super.key}) extends ConsumerWidget {
     final multiCam = ref.watch(multiCamProvider);
     final compact = context.isCompact;
     final isDesktop = !platform.isWeb && platform.isDesktop;
+    final obsSync = isDesktop ? ref.watch(obsSyncProvider) : const ObsSyncState();
 
     final fitLabel = display.coverFit ? 'Fill' : 'Fit';
     final audioLabel = display.audioMuted ? 'Muted' : 'Audio';
@@ -37,7 +40,7 @@ class const ReceiverControlsBar({super.key}) extends ConsumerWidget {
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 980),
+        constraints: const BoxConstraints(maxWidth: 1150),
         child: DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: .circular(999),
@@ -107,13 +110,24 @@ class const ReceiverControlsBar({super.key}) extends ConsumerWidget {
                         accentColor: display.cleanFeedMode ? AppColors.cyanAccent : null,
                         onPressed: notifier.toggleCleanFeed,
                       ),
-                      if (isDesktop)
+                      if (isDesktop) ...[
+                        _DockButton(
+                          icon: Icons.videocam_rounded,
+                          label: compact ? null : 'Virtual Cam',
+                          tooltip: 'Virtual Cam & OBS Sync',
+                          active: obsSync.connected || obsSync.virtualCamActive,
+                          accentColor: obsSync.virtualCamActive
+                              ? AppColors.accentRed
+                              : (obsSync.connected ? AppColors.accentGreen : null),
+                          onPressed: () => ObsVirtualCamSheet.show(context),
+                        ),
                         _DockButton(
                           icon: Icons.open_in_new_rounded,
                           label: compact ? null : '+ Window',
                           tooltip: canOpenWindow ? 'Open secondary camera window' : 'Max camera windows open',
                           onPressed: () => _openWindow(context, ref),
                         ),
+                      ],
                       if (!compact) _divider(),
                       _DockButton(
                         icon: display.audioMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,

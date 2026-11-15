@@ -2,10 +2,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/constants/stream_constants.dart';
+import '../models/audio_routing_config.dart';
 import '../models/camera_rig_preset.dart';
 import '../models/media_source_type.dart';
 import '../models/stream_config.dart';
 import '../models/viewer_display_config.dart';
+import 'preferences_provider.dart';
 
 /// Persistent application preferences for hosting, pairing, and UI theme.
 class const AppSettings({
@@ -72,6 +74,7 @@ Map<String, dynamic> streamConfigToJson(StreamConfig config) => {
   'frameRate': config.frameRate,
   'videoBitrate': config.videoBitrate,
   'enableAudio': config.enableAudio,
+  'voiceCleanAudio': config.voiceCleanAudio,
   'cameraLens': config.cameraLens.name,
   'sourceType': config.sourceType.name,
   if (config.desktopSourceId != null) 'desktopSourceId': config.desktopSourceId,
@@ -91,6 +94,7 @@ StreamConfig streamConfigFromJson(Map<String, dynamic> json) {
           )
         : StreamConstants.defaultVideoBitrate,
     enableAudio: (json['enableAudio'] as bool?) ?? true,
+    voiceCleanAudio: (json['voiceCleanAudio'] as bool?) ?? true,
     cameraLens: _parseEnum(CameraLens.values, json['cameraLens']) ?? .back,
     sourceType: _parseEnum(MediaSourceType.values, json['sourceType']) ?? .camera,
     desktopSourceId: json['desktopSourceId'] is String
@@ -175,6 +179,9 @@ class StreamConfigNotifier extends Notifier<StreamConfig> {
   void setEnableAudio(bool enableAudio) =>
       state = state.copyWith(enableAudio: enableAudio);
 
+  void setVoiceCleanAudio(bool enabled) =>
+      state = state.copyWith(voiceCleanAudio: enabled);
+
   void setDesktopSourceId(String? id) => state = state.copyWith(
     desktopSourceId: id,
     clearDesktopSource: id == null,
@@ -190,7 +197,12 @@ final viewerDisplayProvider =
 /// Notifier managing receiver fit, mirror, rotation, framing, color, and HUD.
 class ViewerDisplayNotifier extends Notifier<ViewerDisplayConfig> {
   @override
-  ViewerDisplayConfig build() => const ViewerDisplayConfig();
+  ViewerDisplayConfig build() {
+    final raw = ref.watch(localPreferencesServiceProvider).loadJsonSection('audioStudio');
+    if (raw == null) return const ViewerDisplayConfig();
+    final audio = AudioStudioConfig.fromJson(raw);
+    return ViewerDisplayConfig(audioGain: audio.gain, audioDelayMs: audio.lipSyncDelayMs);
+  }
 
   void toggleFit() => state = state.copyWith(coverFit: !state.coverFit);
 
@@ -249,6 +261,17 @@ class ViewerDisplayNotifier extends Notifier<ViewerDisplayConfig> {
   void setSaturation(double value) =>
       state = state.copyWith(saturation: value.clamp(0.0, 2.0));
 
+  void setLookPreset(StudioLookPreset preset) =>
+      state = state.copyWith(lookPreset: preset);
+
+  void toggleVignette() => state = state.copyWith(vignette: !state.vignette);
+
+  void setAudioGain(double gain) =>
+      state = state.copyWith(audioGain: gain.clamp(0.0, 2.0).toDouble());
+
+  void setAudioDelayMs(int delayMs) =>
+      state = state.copyWith(audioDelayMs: delayMs.clamp(0, 500));
+
   void resetFramingAndColor() => state = state.copyWith(
     aspectPreset: .free,
     digitalZoom: 1.0,
@@ -257,6 +280,8 @@ class ViewerDisplayNotifier extends Notifier<ViewerDisplayConfig> {
     brightness: 0.0,
     contrast: 1.0,
     saturation: 1.0,
+    lookPreset: .natural,
+    vignette: false,
   );
 
   void reset() => state = const ViewerDisplayConfig();

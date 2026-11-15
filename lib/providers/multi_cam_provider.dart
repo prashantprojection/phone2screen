@@ -12,6 +12,7 @@ import '../services/signaling/signaling_server_service.dart';
 import '../services/webrtc/webrtc_session_service.dart';
 import '../services/windowing/desktop_window_service.dart';
 import 'discovery_provider.dart';
+import 'obs_sync_provider.dart';
 import 'platform_provider.dart';
 import 'session_provider.dart';
 import 'settings_provider.dart';
@@ -85,18 +86,29 @@ class MultiCamNotifier extends Notifier<MultiCamState> {
   /// Selects primary (`null`) or a secondary camera slot by [peerId].
   void selectSlot(String? peerId) {
     final resolved = peerId != null && state.secondarySlots.containsKey(peerId) ? peerId : null;
+    if (resolved == state.selectedPeerId) return;
     state = state.copyWith(selectedPeerId: resolved, clearSelectedPeer: resolved == null);
+    if (state.secondarySlots.isNotEmpty && !ref.read(obsSyncProvider).connected) {
+      broadcastTally(const LiveTallyMessage(state: .program), inactiveSlotTally: const LiveTallyMessage(state: .preview));
+    }
+  }
+
+  /// Forwards [tally] to primary and secondary peers (using [inactiveSlotTally]
+  /// for unfocused cameras during local multi-cam focus changes).
+  void broadcastTally(LiveTallyMessage tally, {LiveTallyMessage? inactiveSlotTally}) {
+    final primaryMsg = (inactiveSlotTally != null && state.selectedPeerId != null) ? inactiveSlotTally : tally;
+    ref.read(sessionProvider.notifier).sendTally(primaryMsg);
+    for (final entry in _peerWebRtc.entries) {
+      final msg = (inactiveSlotTally != null && state.selectedPeerId != entry.key) ? inactiveSlotTally : tally;
+      entry.value.sendTally(msg);
+    }
   }
 
   /// Pins the multi-camera stage layout to [layout] until feeds return to zero.
-  void setLayout(MultiCamLayout layout) =>
-      state = state.copyWith(layout: layout, layoutUserPinned: true);
+  void setLayout(MultiCamLayout layout) => state = state.copyWith(layout: layout, layoutUserPinned: true);
 
   /// Updates the per-camera [ViewerDisplayConfig] for secondary [peerId].
-  void updateSecondaryDisplay(
-    String peerId,
-    ViewerDisplayConfig Function(ViewerDisplayConfig) update,
-  ) {
+  void updateSecondaryDisplay(String peerId, ViewerDisplayConfig Function(ViewerDisplayConfig) update) {
     if (!state.secondarySlots.containsKey(peerId)) return;
     _updateSlot(peerId, (s) => s.copyWith(displayConfig: update(s.displayConfig)));
   }
@@ -107,11 +119,10 @@ class MultiCamNotifier extends Notifier<MultiCamState> {
 
   /// Launches an auxiliary desktop camera receiver window on the next free slot.
   Future<DesktopWindowEntry?> openCameraWindow({bool cleanFeed = false}) async {
-    final basePort = ref.read(sessionProvider).activeEndpoint?.port ??
-        ref.read(appSettingsProvider).preferredPort;
+    final basePort = ref.read(sessionProvider).activeEndpoint?.port ?? ref.read(appSettingsProvider).preferredPort;
     final service = ref.read(desktopWindowServiceProvider);
     final entry = await service.openCameraWindow(basePort: basePort, cleanFeed: cleanFeed);
-    if (ref.mounted) state = state.copyWith(childWindows: service.activeWindows);
+    _syncWindowsAndUsb(service.activeWindows, basePort);
     return entry;
   }
 
@@ -119,8 +130,18 @@ class MultiCamNotifier extends Notifier<MultiCamState> {
   Future<bool> closeCameraWindow(int slot) async {
     final service = ref.read(desktopWindowServiceProvider);
     final closed = await service.closeWindow(slot);
-    if (ref.mounted) state = state.copyWith(childWindows: service.activeWindows);
+    final basePort = ref.read(sessionProvider).activeEndpoint?.port ?? ref.read(appSettingsProvider).preferredPort;
+    _syncWindowsAndUsb(service.activeWindows, basePort);
     return closed;
+  }
+
+  void _syncWindowsAndUsb(List<DesktopWindowEntry> windows, int basePort) {
+    if (!ref.mounted) return;
+    state = state.copyWith(childWindows: windows);
+    final platform = ref.read(platformServiceProvider);
+    if (!platform.isWeb && platform.isDesktop) {
+      unawaited(ref.read(usbBridgeServiceProvider).syncAdbReversePorts([basePort, ...windows.map((w) => w.port)]));
+    }
   }
 
   /// Disconnects all active secondary peers while keeping primary hosting intact.
@@ -197,6 +218,13 @@ class MultiCamNotifier extends Notifier<MultiCamState> {
       rtc.onRemoteStream.listen((s) => _updateSlot(peerId, (slot) => slot.copyWith(stream: s))),
       rtc.telemetryStream.listen((t) => _updateSlot(peerId, (slot) => slot.copyWith(telemetry: t))),
       rtc.incomingCameraStates.listen((cam) => _updateSlot(peerId, (slot) => slot.copyWith(cameraState: cam))),
+      rtc.onControlChannelOpen.listen((_) {
+        if (!ref.mounted || _peerWebRtc[peerId] != rtc) return;
+        final obs = ref.read(obsSyncProvider);
+        rtc.sendTally(obs.connected
+            ? LiveTallyMessage(state: obs.tallyState == .off ? .program : obs.tallyState, sceneName: obs.programScene)
+            : LiveTallyMessage(state: state.selectedPeerId == peerId ? .program : .preview));
+      }),
       rtc.onConnectionState.listen((s) {
         if ((s == .RTCPeerConnectionStateFailed || s == .RTCPeerConnectionStateClosed) && _peerWebRtc[peerId] == rtc) {
           unawaited(_removeSecondaryPeer(peerId));
@@ -234,12 +262,16 @@ class MultiCamNotifier extends Notifier<MultiCamState> {
 
     final updated = Map<String, CameraFeedSlot>.of(state.secondarySlots)..remove(peerId);
     final empty = updated.isEmpty;
+    final wasSelected = state.selectedPeerId == peerId;
     state = state.copyWith(
       secondarySlots: Map.unmodifiable(updated),
-      clearSelectedPeer: state.selectedPeerId == peerId,
+      clearSelectedPeer: wasSelected,
       layout: empty ? .solo : _autoLayoutForCount(updated.length),
       layoutUserPinned: empty ? false : state.layoutUserPinned,
     );
+    if (wasSelected && !ref.read(obsSyncProvider).connected) {
+      broadcastTally(const LiveTallyMessage(state: .program), inactiveSlotTally: const LiveTallyMessage(state: .preview));
+    }
   }
 
   MultiCamLayout _autoLayoutForCount(int count) =>
@@ -255,13 +287,10 @@ class MultiCamNotifier extends Notifier<MultiCamState> {
   }
 
   void _disposeAll() {
-    for (final sub in _hubSubs.toList()) {
+    for (final sub in [..._hubSubs, ..._peerSubs.values.expand((e) => e)]) {
       unawaited(sub.cancel());
     }
     _hubSubs.clear();
-    for (final sub in _peerSubs.values.expand((e) => e).toList()) {
-      unawaited(sub.cancel());
-    }
     _peerSubs.clear();
     for (final rtc in _peerWebRtc.values.toList()) {
       unawaited(rtc.dispose());

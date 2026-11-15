@@ -3,7 +3,15 @@ import 'dart:math' as math;
 import 'media_source_type.dart';
 
 /// Remote camera actions sent from a Receiver HUD to the broadcasting Sender.
-enum RemoteCameraCommandType { flip, torch, micMute, zoom, exposure, focusLock }
+enum RemoteCameraCommandType {
+  flip,
+  torch,
+  micMute,
+  zoom,
+  exposure,
+  focusLock,
+  voiceMode,
+}
 
 /// Control command transmitted over the `phone2screen-control` DataChannel.
 class const RemoteCameraCommand({
@@ -55,6 +63,7 @@ class const RemoteCameraState({
   final double exposureOffset = 0.0,
   final bool focusLocked = false,
   final bool controlsSupported = true,
+  final bool voiceClean = true,
 }) {
   /// Returns an updated copy of [RemoteCameraState].
   RemoteCameraState copyWith({
@@ -67,6 +76,7 @@ class const RemoteCameraState({
     double? exposureOffset,
     bool? focusLocked,
     bool? controlsSupported,
+    bool? voiceClean,
   }) => RemoteCameraState(
     lens: lens ?? this.lens,
     torchOn: torchOn ?? this.torchOn,
@@ -77,6 +87,7 @@ class const RemoteCameraState({
     exposureOffset: exposureOffset ?? this.exposureOffset,
     focusLocked: focusLocked ?? this.focusLocked,
     controlsSupported: controlsSupported ?? this.controlsSupported,
+    voiceClean: voiceClean ?? this.voiceClean,
   );
 
   /// Encodes this state as a `cam_state` JSON frame.
@@ -91,6 +102,7 @@ class const RemoteCameraState({
     'exposureOffset': exposureOffset,
     'focusLocked': focusLocked,
     'controlsSupported': controlsSupported,
+    'voiceClean': voiceClean,
   };
 
   /// Parses a `cam_state` JSON frame, returning `null` when invalid.
@@ -111,6 +123,7 @@ class const RemoteCameraState({
       ),
       focusLocked: _asBool(map['focusLocked']),
       controlsSupported: _asBool(map['controlsSupported'], true),
+      voiceClean: _asBool(map['voiceClean'], true),
     );
   }
 
@@ -127,7 +140,8 @@ class const RemoteCameraState({
           maxZoom == other.maxZoom &&
           exposureOffset == other.exposureOffset &&
           focusLocked == other.focusLocked &&
-          controlsSupported == other.controlsSupported;
+          controlsSupported == other.controlsSupported &&
+          voiceClean == other.voiceClean;
 
   @override
   int get hashCode => Object.hash(
@@ -140,6 +154,7 @@ class const RemoteCameraState({
     exposureOffset,
     focusLocked,
     controlsSupported,
+    voiceClean,
   );
 }
 

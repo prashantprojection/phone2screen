@@ -6,6 +6,7 @@ import '../models/camera_control_state.dart';
 import '../models/clipboard_item.dart';
 import '../models/device_role.dart';
 import '../models/media_source_type.dart';
+import '../models/obs_sync_state.dart';
 import '../models/signaling_data.dart';
 import '../models/signaling_message.dart';
 import '../services/webrtc/media_capture_service.dart';
@@ -140,6 +141,9 @@ class SessionNotifier extends Notifier<SessionState> implements SessionContext {
     try {
       await ref.read(lanDiscoveryServiceProvider).startListening();
       if (_epoch != epoch || !ref.mounted) return;
+      unawaited(
+        ref.read(usbLoopbackPeersProvider.notifier).refresh(ignoreSessionId: _activeSessionId),
+      );
       if (state.phase == .idle || state.phase == .failed) {
         state = state.copyWith(phase: .discovering, clearError: true);
       }
@@ -219,6 +223,9 @@ class SessionNotifier extends Notifier<SessionState> implements SessionContext {
   bool sendRemoteCameraCommand(RemoteCameraCommand cmd) =>
       webrtc.sendCameraCommand(cmd);
 
+  /// Sends a live OBS tally status (`tally`) to the connected Sender.
+  bool sendTally(LiveTallyMessage tally) => webrtc.sendTally(tally);
+
   @override
   void publishCurrentCameraState() {
     if (!ref.mounted) return;
@@ -228,6 +235,7 @@ class SessionNotifier extends Notifier<SessionState> implements SessionContext {
         lens: cfg.cameraLens,
         torchOn: state.isTorchOn,
         micMuted: state.isMicMuted,
+        voiceClean: cfg.voiceCleanAudio,
         controlsSupported:
             cfg.sourceType == .camera && mediaCapture.isCameraControlPlatform,
       ),
@@ -237,12 +245,18 @@ class SessionNotifier extends Notifier<SessionState> implements SessionContext {
   @override
   Future<void> applyLocalCameraCommand(RemoteCameraCommand cmd) async {
     if (!ref.mounted) return;
-    final currentLens = ref.read(streamConfigProvider).cameraLens;
-    final prev = state.remoteCameraState.copyWith(lens: currentLens);
+    final cfg = ref.read(streamConfigProvider);
+    final prev = state.remoteCameraState.copyWith(
+      lens: cfg.cameraLens,
+      voiceClean: cfg.voiceCleanAudio,
+    );
     final next = await mediaCapture.applyCameraCommand(cmd, prev);
     if (!ref.mounted) return;
-    if (next.lens != currentLens) {
+    if (next.lens != cfg.cameraLens) {
       ref.read(streamConfigProvider.notifier).setCameraLens(next.lens);
+    }
+    if (next.voiceClean != prev.voiceClean) {
+      ref.read(streamConfigProvider.notifier).setVoiceCleanAudio(next.voiceClean);
     }
     _syncCameraState(next, isMicMuted: next.micMuted, isTorchOn: next.torchOn);
   }

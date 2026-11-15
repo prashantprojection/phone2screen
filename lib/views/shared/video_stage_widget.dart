@@ -52,19 +52,25 @@ class _VideoStageWidgetState extends State<VideoStageWidget> {
         oldWidget.stream?.id != widget.stream?.id || oldWidget.stream != widget.stream;
     final muteChanged =
         oldWidget.displayConfig.audioMuted != widget.displayConfig.audioMuted;
+    final gainChanged =
+        oldWidget.displayConfig.audioGain != widget.displayConfig.audioGain;
     if (streamChanged && _initialized) _renderer.srcObject = widget.stream;
-    if (streamChanged || muteChanged) _syncAudioMute(forceApply: muteChanged);
+    if (streamChanged || muteChanged || gainChanged) {
+      _syncAudioMute(forceApply: muteChanged || gainChanged);
+    }
   }
 
   void _syncAudioMute({required bool forceApply}) {
     final stream = widget.stream;
     if (stream == null) return;
     final muted = widget.displayConfig.audioMuted;
-    // Avoid overriding local sender mic state unless audioMuted is active or changed.
-    if (!forceApply && !muted) return;
+    final gain = widget.displayConfig.audioGain.clamp(0.0, 2.0).toDouble();
+    // Avoid overriding local sender mic state unless muted, gain-adjusted, or changed.
+    if (!forceApply && !muted && gain == 1.0) return;
+    final targetVolume = muted ? 0.0 : gain;
     for (final track in stream.getAudioTracks()) {
       track.enabled = !muted;
-      if (!kIsWeb) unawaited(_applyTrackVolume(track, muted ? 0.0 : 1.0));
+      if (!kIsWeb) unawaited(_applyTrackVolume(track, targetVolume));
     }
   }
 
@@ -148,12 +154,29 @@ class _VideoStageWidgetState extends State<VideoStageWidget> {
           )
         : ClipRect(child: video);
 
-    if (config.showGrid && !config.cleanFeedMode) {
+    final showGrid = config.showGrid && !config.cleanFeedMode;
+    if (config.vignette || showGrid) {
       framed = Stack(
         fit: .expand,
         children: [
           framed,
-          const IgnorePointer(child: CustomPaint(painter: _ThirdsGridPainter())),
+          if (config.vignette)
+            IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    radius: 0.88,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.52),
+                    ],
+                    stops: const [0.58, 1.0],
+                  ),
+                ),
+              ),
+            ),
+          if (showGrid)
+            const IgnorePointer(child: CustomPaint(painter: _ThirdsGridPainter())),
         ],
       );
     }

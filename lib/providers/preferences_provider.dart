@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/audio_routing_config.dart';
 import '../models/camera_rig_preset.dart';
 import '../models/signaling_data.dart';
 import '../models/window_launch_args.dart';
@@ -91,7 +92,8 @@ class LastEndpointNotifier extends Notifier<SignalingData?> {
   Future<void> clear() => setLastEndpoint(null);
 }
 
-/// Hydrates settings, stream config, and shortcut providers from [snapshot].
+/// Hydrates settings, stream config, shortcut, and viewer audio defaults from
+/// [snapshot] and persisted sections.
 void hydrateProvidersFromPreferences(
   ProviderContainer container,
   PreferencesSnapshot snapshot,
@@ -99,6 +101,15 @@ void hydrateProvidersFromPreferences(
   container.read(appSettingsProvider.notifier).replace(snapshot.appSettings);
   container.read(streamConfigProvider.notifier).replace(snapshot.streamConfig);
   container.read(shortcutProvider.notifier).replaceConfig(snapshot.shortcutConfig);
+  final audioStudioJson = container
+      .read(localPreferencesServiceProvider)
+      .loadJsonSection('audioStudio');
+  if (audioStudioJson != null) {
+    final audioCfg = AudioStudioConfig.fromJson(audioStudioJson);
+    container.read(viewerDisplayProvider.notifier)
+      ..setAudioGain(audioCfg.gain)
+      ..setAudioDelayMs(audioCfg.lipSyncDelayMs);
+  }
 }
 
 /// Listens to app settings, stream config, and shortcut updates and persists

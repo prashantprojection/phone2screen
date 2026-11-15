@@ -1,8 +1,13 @@
+import 'dart:async';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/constants/stream_constants.dart';
 import '../models/signaling_data.dart';
 import 'discovery_provider.dart';
+import 'multi_cam_provider.dart';
+import 'obs_sync_provider.dart';
 import 'platform_provider.dart';
 import 'preferences_provider.dart';
 import 'session_sender_flow.dart';
@@ -50,15 +55,12 @@ class SessionHostFlow {
 
       final settings = ref.read(appSettingsProvider);
       final launchArgs = ref.read(windowLaunchArgsProvider);
-      final preferredPort =
-          launchArgs.preferredPortOverride ?? settings.preferredPort;
+      final preferredPort = launchArgs.preferredPortOverride ?? settings.preferredPort;
       final effectiveName = launchArgs.isSecondaryCameraWindow
           ? '$deviceName • Cam ${launchArgs.cameraSlot}'
           : deviceName;
       final maxPeers =
-          (!platform.isWeb &&
-              platform.isDesktop &&
-              !launchArgs.isSecondaryCameraWindow)
+          (!platform.isWeb && platform.isDesktop && !launchArgs.isSecondaryCameraWindow)
           ? StreamConstants.maxDesktopReceiverPeers
           : StreamConstants.maxActivePeers;
       final pin = settings.pin.trim();
@@ -72,21 +74,20 @@ class SessionHostFlow {
         maxPeers: maxPeers,
       );
       if (ctx.epoch != epoch || !ctx.isNotifierMounted) return;
+      if (!platform.isWeb && platform.isDesktop) {
+        unawaited(ref.read(usbBridgeServiceProvider).syncAdbReversePorts([port]));
+      }
 
       final endpoint = SignalingData(
-        ip: ip,
-        port: port,
-        httpsPort: server.boundHttpsPort,
-        sessionId: sessionId,
-        deviceName: effectiveName,
-        requiresPin: pin.isNotEmpty,
+        ip: ip, port: port, httpsPort: server.boundHttpsPort,
+        sessionId: sessionId, deviceName: effectiveName, requiresPin: pin.isNotEmpty,
       );
 
       bridge.wireWebRtc(
         ctx,
         onHostPeerFailed: (err) => resetPeerToLobby(ctx, errorMessage: err),
-        onSenderPeerFailed: (err) =>
-            senderFlow.teardown(ctx, .failed, errorMessage: err),
+        onSenderPeerFailed: (err) => senderFlow.teardown(ctx, .failed, errorMessage: err),
+        readHostTally: () => _readHostTally(ref),
       );
       await bridge.listenServer(
         server,
@@ -95,40 +96,28 @@ class SessionHostFlow {
           webrtc: ctx.webrtc,
           server: server,
           sessionId: ctx.activeSessionId ?? m.sessionId,
-          isActive: () =>
-              ctx.epoch == epoch && ctx.isNotifierMounted && ctx.isHosting,
+          isActive: () => ctx.epoch == epoch && ctx.isNotifierMounted && ctx.isHosting,
           onHello: (name) => ctx.currentState = ctx.currentState.copyWith(
-            phase: .connecting,
-            connectedPeerName: name,
-            clearError: true,
+            phase: .connecting, connectedPeerName: name, clearError: true,
           ),
           onBye: () => resetPeerToLobby(ctx),
         ),
         onClientEvent: (connected) async {
-          if (ctx.epoch != epoch || !ctx.isNotifierMounted || !ctx.isHosting) {
-            return;
-          }
+          if (ctx.epoch != epoch || !ctx.isNotifierMounted || !ctx.isHosting) return;
           final p = ctx.currentState.phase;
-          if (!connected &&
-              (p == .connecting || p == .streaming || p == .reconnecting)) {
+          if (!connected && (p == .connecting || p == .streaming || p == .reconnecting)) {
             await resetPeerToLobby(ctx);
           }
         },
       );
       await ref.read(lanDiscoveryServiceProvider).startBroadcasting(endpoint);
       if (ctx.epoch != epoch || !ctx.isNotifierMounted) return;
-      ctx.currentState = ctx.currentState.reset(
-        phase: .hosting,
-        activeEndpoint: endpoint,
-      );
+      ctx.currentState = ctx.currentState.reset(phase: .hosting, activeEndpoint: endpoint);
     } catch (e) {
       if (ctx.epoch != epoch || !ctx.isNotifierMounted) return;
       ctx.isHosting = false;
       ctx.activeSessionId = null;
-      ctx.currentState = ctx.currentState.copyWith(
-        phase: .failed,
-        errorMessage: friendlySessionError(e),
-      );
+      ctx.currentState = ctx.currentState.copyWith(phase: .failed, errorMessage: friendlySessionError(e));
     }
   }
 
@@ -163,5 +152,15 @@ class SessionHostFlow {
       activeEndpoint: ctx.currentState.activeEndpoint,
       errorMessage: errorMessage,
     );
+  }
+
+  LiveTallyMessage _readHostTally(Ref ref) {
+    final obs = ref.read(obsSyncProvider);
+    if (obs.connected) {
+      return LiveTallyMessage(state: obs.tallyState == .off ? .program : obs.tallyState, sceneName: obs.programScene);
+    }
+    final multiCam = ref.read(multiCamProvider);
+    final focused = multiCam.secondarySlots.isEmpty || multiCam.selectedPeerId == null;
+    return LiveTallyMessage(state: focused ? .program : .preview);
   }
 }

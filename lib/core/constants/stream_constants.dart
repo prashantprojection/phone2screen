@@ -21,6 +21,8 @@ abstract final class StreamConstants {
   static const int maxActivePeers = 1;
   static const int maxDesktopReceiverPeers = 4;
   static const String obsCleanFeedPath = '/obs';
+  static const String usbInfoPath = '/p2s-info';
+  static const int defaultObsWsPort = 4455;
 
   // Video resolution presets
   static const int width720p = 1280;

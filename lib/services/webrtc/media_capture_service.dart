@@ -158,9 +158,16 @@ class MediaCaptureService {
       'height': {'ideal': config.height},
       'frameRate': {'ideal': config.frameRate},
     };
+    final dynamic audioConstraints = captureAudio
+        ? <String, dynamic>{
+            'echoCancellation': config.voiceCleanAudio,
+            'noiseSuppression': config.voiceCleanAudio,
+            'autoGainControl': config.voiceCleanAudio,
+          }
+        : false;
     try {
       return await navigator.mediaDevices.getUserMedia({
-        'audio': captureAudio,
+        'audio': audioConstraints,
         'video': videoConstraints,
       });
     } catch (_) {

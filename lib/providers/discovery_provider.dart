@@ -4,6 +4,7 @@ import '../models/discovered_peer.dart';
 import '../models/network_interface_info.dart';
 import '../services/network/lan_discovery_service.dart';
 import '../services/network/network_address_service.dart';
+import '../services/network/usb_bridge_service.dart';
 import '../services/signaling/signaling_client_service.dart';
 import '../services/signaling/signaling_server_service.dart';
 
@@ -15,6 +16,13 @@ final networkAddressServiceProvider = Provider<NetworkAddressService>(
 /// Injectable UDP LAN discovery service (port 41234, `P2S_V1`).
 final lanDiscoveryServiceProvider = Provider<LanDiscoveryService>((ref) {
   final service = LanDiscoveryService();
+  ref.onDispose(service.dispose);
+  return service;
+});
+
+/// Injectable USB ADB reverse-tunnel & 127.0.0.1 loopback bridge service.
+final usbBridgeServiceProvider = Provider<UsbBridgeService>((ref) {
+  final service = UsbBridgeService();
   ref.onDispose(service.dispose);
   return service;
 });
@@ -56,3 +64,43 @@ class SelectedIpNotifier extends Notifier<String?> {
 final discoveredPeersProvider = StreamProvider<List<DiscoveredPeer>>(
   (ref) => ref.watch(lanDiscoveryServiceProvider).peersStream,
 );
+
+/// Live stream of desktop ADB reverse-tunnel availability and forwarded ports.
+final usbBridgeStatusProvider = StreamProvider<UsbBridgeStatus>(
+  (ref) => ref.watch(usbBridgeServiceProvider).statusStream,
+);
+
+/// USB `127.0.0.1` loopback Receiver peers discovered via `adb reverse`.
+final usbLoopbackPeersProvider =
+    NotifierProvider<UsbLoopbackPeersNotifier, List<DiscoveredPeer>>(
+      UsbLoopbackPeersNotifier.new,
+    );
+
+/// Probes loopback ports for USB-tunneled Receivers without blocking LAN scan.
+class UsbLoopbackPeersNotifier extends Notifier<List<DiscoveredPeer>> {
+  @override
+  List<DiscoveredPeer> build() => const [];
+
+  /// Probes `127.0.0.1` loopback receivers and updates the cached list.
+  Future<void> refresh({String? ignoreSessionId}) async {
+    final peers = await ref
+        .read(usbBridgeServiceProvider)
+        .probeLoopbackReceivers(ignoreSessionId: ignoreSessionId);
+    if (!ref.mounted) return;
+    state = List.unmodifiable(peers);
+  }
+}
+
+/// Combined list of USB loopback peers (first) and UDP LAN peers, deduped.
+final allDiscoveredPeersProvider = Provider<List<DiscoveredPeer>>((ref) {
+  final usbPeers = ref.watch(usbLoopbackPeersProvider);
+  final lanPeers = ref.watch(discoveredPeersProvider).value ?? const [];
+  final merged = <DiscoveredPeer>[];
+  final seen = <String>{};
+  for (final peer in [...usbPeers, ...lanPeers]) {
+    final sid = peer.endpoint.sessionId.trim();
+    final key = sid.isNotEmpty ? sid : '${peer.endpoint.ip}:${peer.endpoint.port}';
+    if (seen.add(key)) merged.add(peer);
+  }
+  return List.unmodifiable(merged);
+});
