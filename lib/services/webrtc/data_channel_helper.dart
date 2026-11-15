@@ -3,13 +3,20 @@ import 'dart:convert';
 
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
+import '../../models/camera_control_state.dart';
 import '../../models/clipboard_item.dart';
 
-/// Manages the `phone2screen-control` WebRTC DataChannel for `ping`/`pong` RTT
-/// measurement and bidirectional clipboard synchronization.
+/// Manages the `phone2screen-control` WebRTC DataChannel for `ping`/`pong` RTT,
+/// bidirectional clipboard synchronization, and remote camera control frames.
 class DataChannelHelper {
   final StreamController<ClipboardItem> _clipboardController =
       StreamController<ClipboardItem>.broadcast();
+  final StreamController<RemoteCameraCommand> _cameraCmdController =
+      StreamController<RemoteCameraCommand>.broadcast();
+  final StreamController<RemoteCameraState> _cameraStateController =
+      StreamController<RemoteCameraState>.broadcast();
+  final StreamController<void> _channelOpenController =
+      StreamController<void>.broadcast();
 
   RTCDataChannel? _channel;
   int _lastLatencyMs = 0;
@@ -19,6 +26,17 @@ class DataChannelHelper {
   /// Stream of remote clipboard items received over the control channel.
   Stream<ClipboardItem> get incomingClipboard => _clipboardController.stream;
 
+  /// Stream of remote camera control commands (`cam_ctrl`) from the viewer.
+  Stream<RemoteCameraCommand> get incomingCameraCommands =>
+      _cameraCmdController.stream;
+
+  /// Stream of authoritative camera hardware state (`cam_state`) snapshots.
+  Stream<RemoteCameraState> get incomingCameraStates =>
+      _cameraStateController.stream;
+
+  /// Emits when the control DataChannel opens so peers can push initial state.
+  Stream<void> get onChannelOpen => _channelOpenController.stream;
+
   /// Latest measured round-trip latency in milliseconds (`0` before first pong).
   int get lastLatencyMs => _lastLatencyMs;
 
@@ -27,12 +45,22 @@ class DataChannelHelper {
 
   /// Attaches an ordered `phone2screen-control` DataChannel to this helper.
   void attach(RTCDataChannel channel) {
+    if (_disposed) return;
     _channel = channel;
-    _isOpen = channel.state == RTCDataChannelState.RTCDataChannelOpen;
+    final initiallyOpen =
+        channel.state == RTCDataChannelState.RTCDataChannelOpen;
+    _isOpen = initiallyOpen;
     channel.onDataChannelState = (state) {
+      if (_channel != channel || _disposed) return;
+      final becameOpen =
+          !_isOpen && state == RTCDataChannelState.RTCDataChannelOpen;
       _isOpen = state == RTCDataChannelState.RTCDataChannelOpen;
+      if (becameOpen) _channelOpenController.add(null);
     };
-    channel.onMessage = _handleMessage;
+    channel.onMessage = (message) {
+      if (_channel == channel && !_disposed) _handleMessage(message);
+    };
+    if (initiallyOpen) _channelOpenController.add(null);
   }
 
   /// Sends a 1Hz heartbeat `ping` frame when the DataChannel is open.
@@ -54,6 +82,12 @@ class DataChannelHelper {
       'ts': DateTime.now().millisecondsSinceEpoch,
     });
   }
+
+  /// Sends a remote camera control command (`cam_ctrl`) from Receiver to Sender.
+  bool sendCameraCommand(RemoteCameraCommand cmd) => _sendJson(cmd.toJson());
+
+  /// Broadcasts authoritative camera hardware state (`cam_state`) to Receiver.
+  bool sendCameraState(RemoteCameraState state) => _sendJson(state.toJson());
 
   void _handleMessage(RTCDataChannelMessage message) {
     if (message.isBinary) return;
@@ -83,6 +117,14 @@ class DataChannelHelper {
             ClipboardItem(text: text, timestamp: timestamp, fromRemote: true),
           );
         }
+      } else if (kind == 'cam_ctrl') {
+        // Forward viewer camera rig requests so the active Sender applies them locally.
+        final cmd = RemoteCameraCommand.tryFromJson(decoded);
+        if (cmd != null && !_disposed) _cameraCmdController.add(cmd);
+      } else if (kind == 'cam_state') {
+        // Sync Sender hardware state back to Receiver so HUD controls stay truthful.
+        final state = RemoteCameraState.tryFromJson(decoded);
+        if (state != null && !_disposed) _cameraStateController.add(state);
       }
     } catch (_) {
       // Ignore malformed DataChannel payloads rather than dropping the stream.
@@ -125,5 +167,8 @@ class DataChannelHelper {
     _disposed = true;
     await reset();
     await _clipboardController.close();
+    await _cameraCmdController.close();
+    await _cameraStateController.close();
+    await _channelOpenController.close();
   }
 }

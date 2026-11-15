@@ -11,6 +11,8 @@ enum ShortcutAction {
   toggleStats,
   openClipboard,
   openGuide,
+  toggleCleanFeed,
+  openCameraRig,
   disconnectStream;
 
   /// Human-readable short title shown in settings and shortcut badges.
@@ -24,6 +26,8 @@ enum ShortcutAction {
     .toggleStats => 'Live Stats',
     .openClipboard => 'Share Text',
     .openGuide => 'How to Use',
+    .toggleCleanFeed => 'OBS Clean View',
+    .openCameraRig => 'Camera Rig & Color',
     .disconnectStream => 'Stop / Disconnect',
   };
 
@@ -38,6 +42,8 @@ enum ShortcutAction {
     .toggleStats => 'Show or hide resolution, FPS, and latency overlay',
     .openClipboard => 'Open live text & clipboard sharing',
     .openGuide => 'Open the quick-start guide',
+    .toggleCleanFeed => 'Hide all window UI for OBS Window Capture',
+    .openCameraRig => 'Open remote phone camera and studio color controls',
     .disconnectStream => 'End the active stream session',
   };
 }
@@ -141,6 +147,8 @@ const Map<ShortcutAction, ShortcutBinding> defaultShortcutBindings = {
   .toggleStats: ShortcutBinding(keyId: 0x00000073, keyLabel: 'S'),
   .openClipboard: ShortcutBinding(keyId: 0x00000063, keyLabel: 'C'),
   .openGuide: ShortcutBinding(keyId: 0x00000067, keyLabel: 'G'),
+  .toggleCleanFeed: ShortcutBinding(keyId: 0x00000062, keyLabel: 'B'),
+  .openCameraRig: ShortcutBinding(keyId: 0x00000076, keyLabel: 'V'),
   .disconnectStream: ShortcutBinding(keyId: 0x00000078, keyLabel: 'X'),
 };
 
@@ -149,6 +157,51 @@ class const ShortcutConfig({
   final bool enabled = true,
   final Map<ShortcutAction, ShortcutBinding> bindings = defaultShortcutBindings,
 }) {
+  /// Serializes [ShortcutConfig] to a JSON-compatible map.
+  Map<String, dynamic> toJson() => {
+    'enabled': enabled,
+    'bindings': {
+      for (final a in ShortcutAction.values)
+        a.name: {
+          'keyId': bindingFor(a).keyId,
+          'keyLabel': bindingFor(a).keyLabel,
+          'control': bindingFor(a).control,
+          'shift': bindingFor(a).shift,
+          'alt': bindingFor(a).alt,
+        },
+    },
+  };
+
+  /// Deserializes [ShortcutConfig] from [json], preserving unique bindings.
+  static ShortcutConfig fromJson(Map<String, dynamic> json) {
+    final resolved = Map<ShortcutAction, ShortcutBinding>.from(defaultShortcutBindings);
+    final rawBindings = json['bindings'];
+    if (rawBindings is Map) {
+      for (final action in ShortcutAction.values) {
+        final e = rawBindings[action.name];
+        if (e is! Map || e['keyId'] is! num || e['keyLabel'] is! String) continue;
+        final label = e['keyLabel'] as String;
+        if (label.isEmpty) continue;
+        final next = ShortcutBinding(
+          keyId: (e['keyId'] as num).toInt(),
+          keyLabel: label,
+          control: (e['control'] as bool?) ?? false,
+          shift: (e['shift'] as bool?) ?? false,
+          alt: (e['alt'] as bool?) ?? false,
+        );
+        final prev = resolved[action]!;
+        for (final other in ShortcutAction.values) {
+          if (other != action && resolved[other] == next) resolved[other] = prev;
+        }
+        resolved[action] = next;
+      }
+    }
+    return ShortcutConfig(
+      enabled: (json['enabled'] as bool?) ?? true,
+      bindings: Map.unmodifiable(resolved),
+    );
+  }
+
   /// Returns the effective [ShortcutBinding] for [action].
   ShortcutBinding bindingFor(ShortcutAction action) =>
       bindings[action] ?? defaultShortcutBindings[action]!;

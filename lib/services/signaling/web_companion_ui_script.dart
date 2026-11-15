@@ -6,10 +6,12 @@ const String webCompanionUiScript = r'''
   const btnMirror = byId('btnMirror'), btnStats = byId('btnStats'), btnFs = byId('btnFs');
   const btnFlip = byId('btnFlip'), btnMic = byId('btnMic');
   const btnCamDock = byId('btnCamDock'), btnScrDock = byId('btnScrDock');
+  const btnRemoteFlip = byId('btnRemoteFlip'), btnRemoteTorch = byId('btnRemoteTorch');
+  const btnRemoteZoom = byId('btnRemoteZoom'), btnObsLink = byId('btnObsLink');
   const clipSheet = byId('clipSheet'), clipBadge = byId('clipBadge'), clipDockBadge = byId('clipDockBadge');
 
   let rot = 0, mirrored = false, coverFit = false, showStats = false;
-  let stageLive = false, fsTimer = null, copyTimer = null, sendTimer = null;
+  let stageLive = false, fsTimer = null, copyTimer = null, sendTimer = null, obsTimer = null;
   const origSendLabel = btnClipSend ? btnClipSend.textContent : 'Send';
   const onClick = (id, fn) => { const el = byId(id); if (el) el.onclick = fn; };
   const setLbl = (el, txt) => { const s = el && el.querySelector('span'); if (s) s.textContent = txt; };
@@ -63,6 +65,24 @@ const String webCompanionUiScript = r'''
         btnMic.classList.toggle('is-muted', muted);
         btnMic.classList.toggle('active', !muted);
         setLbl(btnMic, stream && !hasAudio ? 'No Mic' : (muted ? 'Mic Off' : 'Mic On'));
+      }
+    } else {
+      const dcOpen = Boolean(dc && dc.readyState === 'open'), rigOk = dcOpen && remoteCam.controlsSupported;
+      if (btnRemoteFlip){
+        btnRemoteFlip.disabled = !rigOk;
+        btnRemoteFlip.classList.toggle('active', rigOk && remoteCam.lens === 'front');
+        setLbl(btnRemoteFlip, dcOpen ? (remoteCam.lens === 'front' ? 'Front' : 'Back') : 'Flip Cam');
+      }
+      if (btnRemoteTorch){
+        btnRemoteTorch.disabled = !rigOk;
+        btnRemoteTorch.classList.toggle('warn-active', rigOk && remoteCam.torchOn);
+        setLbl(btnRemoteTorch, remoteCam.torchOn ? 'Light On' : 'Light');
+      }
+      if (btnRemoteZoom){
+        const canZoom = rigOk && remoteCam.maxZoom > 1.05;
+        btnRemoteZoom.disabled = !canZoom;
+        btnRemoteZoom.classList.toggle('active', canZoom && remoteCam.zoom >= 1.5);
+        setLbl(btnRemoteZoom, remoteCam.zoom >= 1.5 ? remoteCam.zoom.toFixed(1).replace(/\.0$/, '') + 'x' : '1x');
       }
     }
   }
@@ -137,17 +157,34 @@ const String webCompanionUiScript = r'''
     document.body.removeChild(ta);
   }
 
+  function buildObsUrl(){
+    const base = location.origin + '/obs', pinEl = byId('pin'), pin = pinEl ? pinEl.value.trim() : '';
+    return (CFG.requiresPin && pin) ? base + '?pin=' + encodeURIComponent(pin) : base;
+  }
+
   onClick('btnMute', () => toggleViewerMute(false));
   onClick('unmutePill', (e) => { e.stopPropagation(); toggleViewerMute(true); });
   onClick('btnFit', toggleFit);
   onClick('btnRotate', rotateVideo);
   onClick('btnMirror', toggleMirror);
+  onClick('btnRemoteFlip', () => sendCamCtrl('flip'));
+  onClick('btnRemoteTorch', () => sendCamCtrl('torch', {enabled: !remoteCam.torchOn}));
+  onClick('btnRemoteZoom', () => sendCamCtrl('zoom', {value: remoteCam.zoom >= 1.5 ? 1 : Math.min(2, remoteCam.maxZoom || 2)}));
+  onClick('btnObsLink', async () => {
+    await copyText(buildObsUrl());
+    if (obsTimer) clearTimeout(obsTimer);
+    if (btnObsLink){
+      setLbl(btnObsLink, 'Copied!'); btnObsLink.classList.add('active');
+      obsTimer = setTimeout(() => { setLbl(btnObsLink, 'OBS URL'); btnObsLink.classList.remove('active'); }, 1500);
+    }
+    showStageToast('OBS Clean Feed URL copied');
+  });
   onClick('btnStats', toggleStats);
   onClick('btnFs', toggleFullscreen);
   onClick('btnHideHud', (e) => { e.stopPropagation(); setHudHidden(true); });
   onClick('btnFsExit', (e) => { e.stopPropagation(); toggleFullscreen(); });
   onClick('btnFlip', switchLiveCamera);
-  onClick('btnMic', toggleLiveMic);
+  onClick('btnMic', () => toggleLiveMic());
   onClick('btnCamDock', () => switchLiveSource('camera'));
   onClick('btnScrDock', () => switchLiveSource('screen'));
   onClick('btnStop', () => { setStatus('Stopped', ''); cleanup(true); });

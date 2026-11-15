@@ -37,6 +37,9 @@ class ShortcutNotifier extends Notifier<ShortcutConfig> {
 
   /// Restores all shortcut bindings and enabled state to defaults.
   void resetDefaults() => state = const ShortcutConfig();
+
+  /// Replaces the full [ShortcutConfig] (used when loading preferences).
+  void replaceConfig(ShortcutConfig config) => state = config;
 }
 
 /// Whether the settings UI is currently recording a replacement key press.

@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import '../models/media_source_type.dart';
 import '../models/session_phase.dart';
 import '../models/signaling_data.dart';
 import 'discovery_provider.dart';
 import 'platform_provider.dart';
+import 'preferences_provider.dart';
 import 'session_signaling_bridge.dart';
 import 'session_state.dart';
 import 'settings_provider.dart';
@@ -83,6 +86,7 @@ class SessionSenderFlow {
         pin: pin,
       );
       if (ctx.epoch != epoch || !ctx.isNotifierMounted) return;
+      unawaited(ref.read(lastEndpointProvider.notifier).setLastEndpoint(target));
 
       final offer = await ctx.webrtc.createOfferForStream(
         localStream,

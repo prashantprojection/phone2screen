@@ -1,8 +1,10 @@
 import 'package:uuid/uuid.dart';
 
+import '../core/constants/stream_constants.dart';
 import '../models/signaling_data.dart';
 import 'discovery_provider.dart';
 import 'platform_provider.dart';
+import 'preferences_provider.dart';
 import 'session_sender_flow.dart';
 import 'session_signaling_bridge.dart';
 import 'session_state.dart';
@@ -47,14 +49,27 @@ class SessionHostFlow {
       if (ctx.epoch != epoch || !ctx.isNotifierMounted) return;
 
       final settings = ref.read(appSettingsProvider);
+      final launchArgs = ref.read(windowLaunchArgsProvider);
+      final preferredPort =
+          launchArgs.preferredPortOverride ?? settings.preferredPort;
+      final effectiveName = launchArgs.isSecondaryCameraWindow
+          ? '$deviceName • Cam ${launchArgs.cameraSlot}'
+          : deviceName;
+      final maxPeers =
+          (!platform.isWeb &&
+              platform.isDesktop &&
+              !launchArgs.isSecondaryCameraWindow)
+          ? StreamConstants.maxDesktopReceiverPeers
+          : StreamConstants.maxActivePeers;
       final pin = settings.pin.trim();
       final server = ref.read(signalingServerServiceProvider);
       final port = await server.start(
-        preferredPort: settings.preferredPort,
+        preferredPort: preferredPort,
         companionMode: .sendToReceiver,
         sessionId: sessionId,
-        deviceName: deviceName,
+        deviceName: effectiveName,
         pin: pin.isEmpty ? null : pin,
+        maxPeers: maxPeers,
       );
       if (ctx.epoch != epoch || !ctx.isNotifierMounted) return;
 
@@ -63,7 +78,7 @@ class SessionHostFlow {
         port: port,
         httpsPort: server.boundHttpsPort,
         sessionId: sessionId,
-        deviceName: deviceName,
+        deviceName: effectiveName,
         requiresPin: pin.isNotEmpty,
       );
 

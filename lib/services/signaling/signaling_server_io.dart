@@ -3,14 +3,26 @@ import 'dart:io';
 
 import '../../core/constants/stream_constants.dart';
 import '../../models/signaling_message.dart';
+import 'signaling_peer_slot.dart';
 import 'signaling_port_binder.dart';
 import 'web_companion_mode.dart';
 
-/// Native `dart:io` HTTP/HTTPS + WebSocket signaling server with single-peer
-/// limit (`maxActivePeers = 1`), optional PIN auth, and Web Companion modes.
+class _PeerSlot {
+  _PeerSlot({required this.peerId, required this.isPrimary, required this.socket});
+
+  final String peerId;
+  final bool isPrimary;
+  final WebSocket socket;
+  StreamSubscription<dynamic>? sub;
+  bool authenticated = false;
+  String? deviceName;
+}
+
+/// Native `dart:io` HTTP/HTTPS + WebSocket signaling server supporting single-peer
+/// (`maxPeers = 1`) or multi-peer (`maxPeers > 1`) slot tracking.
 class SignalingServerImpl {
-  final _messagesController = StreamController<SignalingMessage>.broadcast();
-  final _connectionEventsController = StreamController<bool>.broadcast();
+  final _hub = SignalingEventHub();
+  final Map<String, _PeerSlot> _slots = {};
 
   HttpServer? _server;
   HttpServer? _httpsServer;
@@ -19,26 +31,20 @@ class SignalingServerImpl {
   int? _boundPort;
   int? _boundHttpsPort;
   WebCompanionMode _companionMode = .sendToReceiver;
-
   String _sessionId = '';
   String _deviceName = 'Phone2Screen';
   String _pin = '';
-
-  WebSocket? _activeSocket;
-  StreamSubscription<dynamic>? _clientSub;
-  bool _clientAuthenticated = false;
+  int _maxPeers = StreamConstants.maxActivePeers;
+  int _nextPeerSeq = 1;
   bool _disposed = false;
 
-  Stream<SignalingMessage> get messages => _messagesController.stream;
-
-  Stream<bool> get clientConnectionEvents => _connectionEventsController.stream;
-
+  Stream<SignalingMessage> get messages => _hub.messages;
+  Stream<bool> get clientConnectionEvents => _hub.clientConnectionEvents;
+  Stream<PeerSignalingEvent> get peerMessages => _hub.peerMessages;
+  Stream<PeerConnectionEvent> get peerConnectionEvents => _hub.peerConnectionEvents;
   int? get boundPort => _boundPort;
-
   int? get boundHttpsPort => _boundHttpsPort;
-
   WebCompanionMode get companionMode => _companionMode;
-
   bool get isRunning => _server != null;
 
   Future<int> start({
@@ -48,13 +54,10 @@ class SignalingServerImpl {
     required String sessionId,
     required String deviceName,
     String? pin,
+    int maxPeers = StreamConstants.maxActivePeers,
   }) async {
-    if (_disposed) {
-      throw StateError('SignalingServerService has been disposed.');
-    }
-    if (isRunning) {
-      await stop();
-    }
+    if (_disposed) throw StateError('SignalingServerService has been disposed.');
+    if (isRunning) await stop();
 
     final server = await bindHttpPortRange(preferredPort);
     final effectiveHttpsPort =
@@ -77,66 +80,41 @@ class SignalingServerImpl {
     _sessionId = sessionId;
     _deviceName = deviceName;
     _pin = pin?.trim() ?? '';
+    _maxPeers = maxPeers < 1 ? 1 : maxPeers;
 
-    _serverSub = server.listen(
-      (request) => unawaited(_handleRequest(request)),
-      onError: (_) {},
-    );
+    _serverSub = server.listen((r) => unawaited(_handleRequest(r)), onError: (_) {});
     _httpsServerSub = httpsServer?.listen(
-      (request) => unawaited(_handleRequest(request)),
+      (r) => unawaited(_handleRequest(r)),
       onError: (_) {},
     );
-
     return server.port;
   }
 
-  void send(SignalingMessage message) {
-    final socket = _activeSocket;
-    if (_disposed || socket == null || !_clientAuthenticated) return;
-    if (socket.readyState != WebSocket.open) return;
-    try {
-      socket.add(message.encode());
-    } catch (_) {
-      // Ignore send errors on races where the socket just closed.
-    }
+  void send(SignalingMessage message, {String? peerId}) {
+    if (_disposed) return;
+    final slot = peerId != null
+        ? _slots[peerId]
+        : _slots.values.where((s) => s.isPrimary).firstOrNull;
+    _sendToSlot(slot, message);
   }
 
-  Future<void> disconnectClient([String reason = 'Host ended session']) async {
-    final socket = _activeSocket;
-    if (socket == null) return;
-
-    final wasAuthenticated = _clientAuthenticated;
-    final sub = _detachActiveSocket();
-    await sub?.cancel();
-
-    if (wasAuthenticated && socket.readyState == WebSocket.open) {
-      try {
-        socket.add(
-          SignalingMessage(
-            type: .bye,
-            sessionId: _sessionId,
-            payload: {'reason': reason},
-          ).encode(),
-        );
-      } catch (_) {}
+  Future<void> disconnectClient([String reason = 'Host ended session', String? peerId]) async {
+    if (peerId != null) {
+      final slot = _slots[peerId];
+      if (slot != null) await _closeSlot(slot, byeReason: reason);
+      return;
     }
-
-    try {
-      await socket.close(WebSocketStatus.normalClosure, reason);
-    } catch (_) {}
-
-    _emitDisconnected(wasAuthenticated);
+    for (final slot in _slots.values.toList()) {
+      await _closeSlot(slot, byeReason: reason);
+    }
   }
 
   Future<void> stop() async {
     await disconnectClient('Host stopped session');
-    final sub = _serverSub;
-    final httpsSub = _httpsServerSub;
+    await _serverSub?.cancel();
+    await _httpsServerSub?.cancel();
     _serverSub = null;
     _httpsServerSub = null;
-    await sub?.cancel();
-    await httpsSub?.cancel();
-
     final server = _server;
     final httpsServer = _httpsServer;
     _server = null;
@@ -151,8 +129,7 @@ class SignalingServerImpl {
     if (_disposed) return;
     _disposed = true;
     await stop();
-    await _messagesController.close();
-    await _connectionEventsController.close();
+    await _hub.close();
   }
 
   Future<void> _handleRequest(HttpRequest request) async {
@@ -171,17 +148,13 @@ class SignalingServerImpl {
         httpsPort: _boundHttpsPort,
       );
     } catch (_) {
-      try {
-        await request.response.close();
-      } catch (_) {}
+      try { await request.response.close(); } catch (_) {}
     }
   }
 
   Future<void> _handleWebSocketUpgrade(HttpRequest request) async {
     if (!WebSocketTransformer.isUpgradeRequest(request)) {
-      request.response
-        ..statusCode = HttpStatus.badRequest
-        ..write('Expected WebSocket upgrade');
+      request.response..statusCode = HttpStatus.badRequest..write('Expected WebSocket upgrade');
       await request.response.close();
       return;
     }
@@ -193,129 +166,123 @@ class SignalingServerImpl {
     }
     socket.pingInterval = const Duration(seconds: 10);
 
-    // Enforce maxActivePeers = 1 so a stray second client cannot hijack an
-    // ongoing stream on low-end mobile hardware.
-    if (_activeSocket != null) {
-      await _rejectSocket(
-        socket,
-        message: 'Host is already in an active session',
-      );
+    // Enforce maxPeers (`1` for mobile/receiver safety, up to `maxDesktopReceiverPeers`).
+    if (_slots.length >= _maxPeers) {
+      final msg = _maxPeers == 1 ? 'Host is already in an active session' : 'Host reached maximum active peers';
+      await _rejectSocket(socket, message: msg);
       return;
     }
 
-    _activeSocket = socket;
-    _clientAuthenticated = false;
-    _clientSub = socket.listen(
-      (raw) => _onClientFrame(socket, raw),
-      onError: (_) => _onClientClosed(socket),
-      onDone: () => _onClientClosed(socket),
+    final peerId = 'peer-${_nextPeerSeq++}';
+    final isPrimary = !_slots.values.any((s) => s.isPrimary);
+    final slot = _PeerSlot(peerId: peerId, isPrimary: isPrimary, socket: socket);
+    _slots[peerId] = slot;
+    slot.sub = socket.listen(
+      (raw) => _onClientFrame(slot, raw),
+      onError: (_) => _onClientClosed(slot),
+      onDone: () => _onClientClosed(slot),
       cancelOnError: true,
     );
   }
 
-  void _onClientFrame(WebSocket socket, dynamic raw) {
-    if (_disposed || _activeSocket != socket || raw is! String) return;
+  void _onClientFrame(_PeerSlot slot, dynamic raw) {
+    if (_disposed || _slots[slot.peerId] != slot || raw is! String) return;
 
-    SignalingMessage message;
+    final SignalingMessage message;
     try {
       message = SignalingMessage.decode(raw);
     } catch (_) {
-      unawaited(
-        _rejectActiveSocket(socket, message: 'Malformed signaling message'),
-      );
+      unawaited(_closeSlot(slot, errorMessage: 'Malformed signaling message'));
       return;
     }
 
-    if (!_clientAuthenticated) {
-      if (message.type != .hello) {
-        unawaited(
-          _rejectActiveSocket(socket, message: 'Expected hello handshake first'),
-        );
+    if (!slot.authenticated) {
+      final err = validateHelloHandshake(message, _pin);
+      if (err != null) {
+        unawaited(_closeSlot(slot, errorMessage: err));
         return;
       }
-      // Validate optional session PIN before admitting the peer and forwarding
-      // signaling messages to the WebRTC layer.
-      final rawPin = message.payload['pin'];
-      final providedPin = rawPin is String ? rawPin : '';
-      if (_pin.isNotEmpty && providedPin != _pin) {
-        unawaited(_rejectActiveSocket(socket, message: 'Invalid PIN'));
-        return;
-      }
-
-      _clientAuthenticated = true;
-      send(
-        SignalingMessage(
-          type: .welcome,
-          sessionId: _sessionId,
-          payload: {'deviceName': _deviceName},
-        ),
+      slot.authenticated = true;
+      slot.deviceName = extractPeerDeviceName(message);
+      _sendToSlot(slot, buildServerWelcome(_sessionId, _deviceName, slot.peerId));
+      _hub.emitConnection(
+        peerId: slot.peerId,
+        isPrimary: slot.isPrimary,
+        connected: true,
+        deviceName: slot.deviceName,
       );
-      if (!_connectionEventsController.isClosed) {
-        _connectionEventsController.add(true);
-      }
-      if (!_messagesController.isClosed) {
-        _messagesController.add(message);
-      }
+      _hub.emitMessage(peerId: slot.peerId, isPrimary: slot.isPrimary, message: message);
       return;
     }
 
-    switch (message.type) {
-      case .offer || .answer || .ice || .bye:
-        if (!_messagesController.isClosed) {
-          _messagesController.add(message);
-        }
-      case .hello || .welcome || .error:
-        // Ignore duplicate handshake or non-client control frames once joined.
-        break;
+    if (message.type == .offer ||
+        message.type == .answer ||
+        message.type == .ice ||
+        message.type == .bye) {
+      _hub.emitMessage(peerId: slot.peerId, isPrimary: slot.isPrimary, message: message);
     }
   }
 
-  Future<void> _rejectSocket(
-    WebSocket socket, {
-    required String message,
-  }) async {
+  void _sendToSlot(_PeerSlot? slot, SignalingMessage message) {
+    if (_disposed || slot == null || !slot.authenticated) return;
+    if (slot.socket.readyState != WebSocket.open) return;
     try {
-      socket.add(
-        SignalingMessage(
-          type: .error,
-          sessionId: _sessionId,
-          payload: {'message': message},
-        ).encode(),
-      );
+      slot.socket.add(message.encode());
+    } catch (_) {}
+  }
+
+  Future<void> _rejectSocket(WebSocket socket, {required String message}) async {
+    try {
+      socket.add(buildServerError(_sessionId, message).encode());
     } catch (_) {}
     try {
       await socket.close(WebSocketStatus.policyViolation, message);
     } catch (_) {}
   }
 
-  Future<void> _rejectActiveSocket(
-    WebSocket socket, {
-    required String message,
+  Future<void> _closeSlot(
+    _PeerSlot slot, {
+    String? byeReason,
+    String? errorMessage,
   }) async {
-    if (_activeSocket == socket) {
-      await _detachActiveSocket()?.cancel();
+    if (_slots.remove(slot.peerId) == null) return;
+    final wasAuthed = slot.authenticated;
+    slot.authenticated = false;
+    final sub = slot.sub;
+    slot.sub = null;
+    await sub?.cancel();
+
+    if (errorMessage != null) {
+      await _rejectSocket(slot.socket, message: errorMessage);
+    } else {
+      if (wasAuthed && byeReason != null && slot.socket.readyState == WebSocket.open) {
+        try {
+          slot.socket.add(buildServerBye(_sessionId, byeReason).encode());
+        } catch (_) {}
+      }
+      try {
+        await slot.socket.close(WebSocketStatus.normalClosure, byeReason ?? 'Closed');
+      } catch (_) {}
     }
-    await _rejectSocket(socket, message: message);
+    _emitDisconnected(slot, wasAuthed);
   }
 
-  void _onClientClosed(WebSocket socket) {
-    if (_activeSocket != socket) return;
-    final wasAuthenticated = _clientAuthenticated;
-    _detachActiveSocket();
-    _emitDisconnected(wasAuthenticated);
+  void _onClientClosed(_PeerSlot slot) {
+    if (_slots.remove(slot.peerId) == null) return;
+    final wasAuthed = slot.authenticated;
+    slot.authenticated = false;
+    slot.sub = null;
+    _emitDisconnected(slot, wasAuthed);
   }
 
-  StreamSubscription<dynamic>? _detachActiveSocket() {
-    final sub = _clientSub;
-    _activeSocket = null;
-    _clientAuthenticated = false;
-    _clientSub = null;
-    return sub;
-  }
-
-  void _emitDisconnected(bool wasAuthenticated) {
-    if (wasAuthenticated && !_disposed && !_connectionEventsController.isClosed) {
-      _connectionEventsController.add(false);
+  void _emitDisconnected(_PeerSlot slot, bool wasAuthed) {
+    if (wasAuthed && !_disposed) {
+      _hub.emitConnection(
+        peerId: slot.peerId,
+        isPrimary: slot.isPrimary,
+        connected: false,
+        deviceName: slot.deviceName,
+      );
     }
   }
 }

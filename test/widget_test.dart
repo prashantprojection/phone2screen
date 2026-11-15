@@ -68,6 +68,8 @@ class _FakeLanDiscoveryService implements LanDiscoveryService {
 class _FakeSignalingServerService implements SignalingServerService {
   final _messages = StreamController<SignalingMessage>.broadcast();
   final _events = StreamController<bool>.broadcast();
+  final _peerMessages = StreamController<PeerSignalingEvent>.broadcast();
+  final _peerEvents = StreamController<PeerConnectionEvent>.broadcast();
   int? _port;
   int? _httpsPort;
   WebCompanionMode _companionMode = .sendToReceiver;
@@ -76,6 +78,10 @@ class _FakeSignalingServerService implements SignalingServerService {
   Stream<SignalingMessage> get messages => _messages.stream;
   @override
   Stream<bool> get clientConnectionEvents => _events.stream;
+  @override
+  Stream<PeerSignalingEvent> get peerMessages => _peerMessages.stream;
+  @override
+  Stream<PeerConnectionEvent> get peerConnectionEvents => _peerEvents.stream;
   @override
   int? get boundPort => _port;
   @override
@@ -93,6 +99,7 @@ class _FakeSignalingServerService implements SignalingServerService {
     required String sessionId,
     required String deviceName,
     String? pin,
+    int maxPeers = 1,
   }) async {
     _httpsPort = preferredHttpsPort;
     _companionMode = companionMode;
@@ -100,9 +107,12 @@ class _FakeSignalingServerService implements SignalingServerService {
   }
 
   @override
-  void send(SignalingMessage message) {}
+  void send(SignalingMessage message, {String? peerId}) {}
   @override
-  Future<void> disconnectClient([String reason = 'Host ended session']) async {}
+  Future<void> disconnectClient([
+    String reason = 'Host ended session',
+    String? peerId,
+  ]) async {}
   @override
   Future<void> stop() async {
     _port = null;
@@ -113,6 +123,8 @@ class _FakeSignalingServerService implements SignalingServerService {
   Future<void> dispose() async {
     await _messages.close();
     await _events.close();
+    await _peerMessages.close();
+    await _peerEvents.close();
   }
 }
 

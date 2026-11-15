@@ -3,7 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/responsive.dart';
 
-/// Plain-English visual quick-start guide for Phone2Screen's three casting modes.
+/// Plain-English visual quick-start guide for Phone2Screen casting & OBS studio workflows.
 class const HowToUseSheet({super.key}) extends StatelessWidget {
   /// Opens the guide as a bottom sheet on phones or a centered dialog on wide screens.
   static Future<void> show(BuildContext context) {
@@ -73,29 +73,29 @@ class const HowToUseSheet({super.key}) extends StatelessWidget {
                 spacing: 12,
                 children: [
                   Text(
-                    'Pick the setup that fits your devices — everything stays private on your local Wi-Fi.',
+                    'Pick the setup that fits your rig — everything stays private on your local Wi-Fi or USB link.',
                     style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
                   ),
                   const _ScenarioCard(
                     icon: Icons.devices_rounded,
                     accent: AppColors.primaryBlue,
                     title: 'Phone to PC',
-                    subtitle: 'Stream between two Phone2Screen apps over the same Wi-Fi.',
+                    subtitle: 'Stream between Phone2Screen apps — ideal for OBS Window Capture & multi-cam.',
                     steps: [
-                      'Open Phone2Screen in Receive mode on your PC or TV.',
-                      'Open Send mode on your phone and pick Camera or Screen.',
-                      'Tap Connect next to your PC, or tap Scan QR Code.',
+                      'Open Receive mode on PC (click + Open Camera Window for extra phones).',
+                      'Open Send mode on your phone, pick a Rig Preset, and tap Connect or Scan QR Code.',
+                      'Press B (OBS Clean) on PC to hide all window UI for clean OBS Window Capture.',
                     ],
                   ),
                   const _ScenarioCard(
                     icon: Icons.open_in_browser_rounded,
                     accent: AppColors.cyanAccent,
                     title: 'Watch in Any Browser',
-                    subtitle: 'Watch on any PC, TV, or tablet browser — no viewer app needed.',
+                    subtitle: 'Feed OBS Studio Browser Source (/obs) or watch in any browser on your LAN.',
                     steps: [
-                      'Open Send mode on the device you want to share.',
-                      'Tap Cast to Web Browser to create a temporary local link.',
-                      'Open the http:// link (or scan the QR code) in any browser on the same Wi-Fi.',
+                      'Open Send mode on the device you want to share and tap Cast to Web Browser.',
+                      'Copy the /obs link into an OBS Browser Source for a zero-UI auto-reconnecting feed.',
+                      'Or open the standard http:// link (or scan the QR) in any browser with remote controls.',
                     ],
                   ),
                   const _ScenarioCard(
@@ -207,15 +207,21 @@ class const _QuickTipsCard() extends StatelessWidget {
     final colors = theme.colorScheme;
 
     const tips = [
-      (Icons.wifi_rounded, 'Same Wi-Fi: Connect both devices to the same Wi-Fi (avoid Guest Wi-Fi).'),
+      (
+        Icons.usb_rounded,
+        'USB Zero-Lag: Enable phone USB Tethering (PC prioritizes USB NIC automatically) or run adb reverse tcp:8080 tcp:8080 and tap USB / ADB with the USB Ultra 20 Mbps preset.',
+      ),
+      (
+        Icons.live_tv_rounded,
+        'OBS Studio & Multi-Cam: Use /obs in Browser Source, press B for Clean Window mode, or click + Open Camera Window on desktop to run up to 4 phones side-by-side.',
+      ),
       (
         Icons.wifi_tethering_rounded,
-        'No Wi-Fi? Turn on your phone hotspot and connect your PC — it works offline with zero mobile data.',
+        'No Wi-Fi? Turn on your phone hotspot and connect your PC — works offline with zero mobile data.',
       ),
-      (Icons.content_paste_go_rounded, 'Share Text: Send links, notes, or passwords live between connected screens.'),
       (
         Icons.fullscreen_rounded,
-        'Fullscreen & Shortcuts: Tap the video in fullscreen (or click Hide Controls) to clear the screen, press Esc anytime to exit fullscreen, and customize keyboard shortcuts in Settings.',
+        'Studio Controls: Press V for Camera Rig & Color grading, B for OBS Clean View, F for Fullscreen (Esc exits), or customize keys in Settings.',
       ),
     ];
 

@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../models/shortcut_config.dart';
+import '../../providers/multi_cam_provider.dart';
 import '../../providers/platform_provider.dart';
 import '../../providers/session_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/shortcut_provider.dart';
+import '../receiver/widgets/remote_camera_panel.dart';
 import 'clipboard_sync_sheet.dart';
 import 'how_to_use_sheet.dart';
 
@@ -46,12 +48,16 @@ class _KeyboardShortcutsScopeState
     final display = ref.read(viewerDisplayProvider);
     final displayNotifier = ref.read(viewerDisplayProvider.notifier);
 
-    // Keep Esc active to exit fullscreen even when shortcuts are disabled.
-    if (event.logicalKey == .escape &&
-        activeRole == .receiver &&
-        display.isFullscreen) {
-      displayNotifier.setFullscreen(false);
-      return true;
+    // Keep Esc active to exit clean feed or fullscreen even when shortcuts are disabled.
+    if (event.logicalKey == .escape && activeRole == .receiver) {
+      if (display.cleanFeedMode) {
+        displayNotifier.setCleanFeed(false);
+        return true;
+      }
+      if (display.isFullscreen) {
+        displayNotifier.setFullscreen(false);
+        return true;
+      }
     }
 
     // Never intercept keystrokes while typing inside an editable text field.
@@ -82,9 +88,11 @@ class _KeyboardShortcutsScopeState
     final display = ref.read(viewerDisplayProvider);
     final displayNotifier = ref.read(viewerDisplayProvider.notifier);
     final sessionNotifier = ref.read(sessionProvider.notifier);
+    final hasMultiCam = ref.read(multiCamProvider).secondarySlots.isNotEmpty;
     final isReceiver = activeRole == .receiver;
-    final isSessionActive =
+    final isPrimaryActive =
         phase == .streaming || phase == .connecting || phase == .reconnecting;
+    final isSessionActive = isPrimaryActive || (isReceiver && hasMultiCam);
 
     switch (action) {
       case .toggleFullscreen:
@@ -128,9 +136,23 @@ class _KeyboardShortcutsScopeState
       case .openGuide:
         HowToUseSheet.show(context);
         return true;
+      case .toggleCleanFeed:
+        if (!isReceiver || (!isSessionActive && !display.cleanFeedMode)) {
+          return false;
+        }
+        displayNotifier.toggleCleanFeed();
+        return true;
+      case .openCameraRig:
+        if (!isReceiver || !isSessionActive) return false;
+        RemoteCameraPanel.show(context);
+        return true;
       case .disconnectStream:
         if (!isSessionActive) return false;
-        sessionNotifier.disconnect();
+        if (isPrimaryActive || activeRole == .sender) {
+          sessionNotifier.disconnect();
+        } else {
+          ref.read(multiCamProvider.notifier).disconnectAll();
+        }
         return true;
     }
   }

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
+import '../models/camera_control_state.dart';
 import '../models/clipboard_item.dart';
 import '../models/session_phase.dart';
 import '../models/signaling_data.dart';
@@ -19,6 +20,7 @@ class const SessionState({
   final StreamTelemetry telemetry = const StreamTelemetry(),
   final bool isMicMuted = false,
   final bool isTorchOn = false,
+  final RemoteCameraState remoteCameraState = const RemoteCameraState(),
   final List<ClipboardItem> clipboardHistory = const [],
   final String? errorMessage,
 }) {
@@ -28,6 +30,7 @@ class const SessionState({
     SignalingData? activeEndpoint,
     String? connectedPeerName,
     bool isWebBroadcast = false,
+    RemoteCameraState remoteCameraState = const RemoteCameraState(),
     String? errorMessage,
   }) {
     return SessionState(
@@ -35,6 +38,7 @@ class const SessionState({
       activeEndpoint: activeEndpoint,
       connectedPeerName: connectedPeerName,
       isWebBroadcast: isWebBroadcast,
+      remoteCameraState: remoteCameraState,
       clipboardHistory: clipboardHistory,
       errorMessage: errorMessage,
     );
@@ -51,6 +55,7 @@ class const SessionState({
     StreamTelemetry? telemetry,
     bool? isMicMuted,
     bool? isTorchOn,
+    RemoteCameraState? remoteCameraState,
     List<ClipboardItem>? clipboardHistory,
     String? errorMessage,
     bool clearEndpoint = false,
@@ -75,6 +80,7 @@ class const SessionState({
       telemetry: telemetry ?? this.telemetry,
       isMicMuted: isMicMuted ?? this.isMicMuted,
       isTorchOn: isTorchOn ?? this.isTorchOn,
+      remoteCameraState: remoteCameraState ?? this.remoteCameraState,
       clipboardHistory: clipboardHistory ?? this.clipboardHistory,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );
@@ -95,6 +101,8 @@ abstract interface class SessionContext {
   int bumpEpoch();
   MediaCaptureService get mediaCapture;
   WebRtcSessionService get webrtc;
+  Future<void> applyLocalCameraCommand(RemoteCameraCommand cmd);
+  void publishCurrentCameraState();
 }
 
 /// Formats thrown errors concisely for UI error banners.

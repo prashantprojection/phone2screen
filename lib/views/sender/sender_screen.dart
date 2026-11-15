@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/responsive.dart';
+import '../../models/stream_config.dart';
 import '../../providers/platform_provider.dart';
 import '../../providers/session_provider.dart';
 import '../../providers/settings_provider.dart';
@@ -11,6 +12,7 @@ import '../shared/video_stage_widget.dart';
 import 'widgets/active_sender_controls.dart';
 import 'widgets/desktop_source_dialog.dart';
 import 'widgets/nearby_devices_list.dart';
+import 'widgets/oled_tally_view.dart';
 import 'widgets/pin_prompt_dialog.dart';
 import 'widgets/qr_scanner_page.dart';
 import 'widgets/source_picker_card.dart';
@@ -57,11 +59,12 @@ class _SenderScreenState extends ConsumerState<SenderScreen> {
   Widget build(BuildContext context) {
     final session = ref.watch(sessionProvider);
     final settings = ref.watch(appSettingsProvider);
+    final config = ref.watch(streamConfigProvider);
     final platform = ref.watch(platformServiceProvider);
     final isLive = session.phase == .connecting || session.phase == .streaming || session.phase == .reconnecting;
 
     if (session.isWebBroadcast && session.phase == .hosting) return WebBroadcastLobbyView(session: session);
-    if (isLive) return _buildLiveView(context, session, settings);
+    if (isLive) return _buildLiveView(context, session, settings, config);
 
     final theme = Theme.of(context);
     final nearbyList = NearbyDevicesList(onScanQr: platform.supportsQrScanner ? _scanQrAndConnect : null);
@@ -114,9 +117,9 @@ class _SenderScreenState extends ConsumerState<SenderScreen> {
     );
   }
 
-  Widget _buildLiveView(BuildContext context, SessionState session, AppSettings settings) {
+  Widget _buildLiveView(BuildContext context, SessionState session, AppSettings settings, StreamConfig config) {
     final peerName = session.connectedPeerName ?? session.activeEndpoint?.deviceName ?? 'Receiver';
-    final showEcoCard = settings.ecoDimPreview && session.phase == .streaming;
+    final showOledTally = settings.ecoDimPreview && session.phase == .streaming;
     final statusColor = session.phase == .streaming ? AppColors.accentGreen : AppColors.accentOrange;
     final statusLabel = '${session.phase == .streaming ? "Live" : "Connecting"} • $peerName';
 
@@ -135,8 +138,14 @@ class _SenderScreenState extends ConsumerState<SenderScreen> {
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: showEcoCard
-                          ? _EcoDimPreviewCard(onShowPreview: () => ref.read(appSettingsProvider.notifier).setEcoDimPreview(false))
+                      child: showOledTally
+                          ? OledTallyView(
+                              targetName: peerName,
+                              phase: session.phase,
+                              telemetry: session.telemetry,
+                              streamConfig: config,
+                              onShowPreview: () => ref.read(appSettingsProvider.notifier).setEcoDimPreview(false),
+                            )
                           : VideoStageWidget(
                               stream: session.localStream,
                               waitingLabel: session.phase == .connecting ? 'Connecting to $peerName...' : 'Preparing stream...',
@@ -198,13 +207,20 @@ class const _BrowserCastCard({required final VoidCallback onStart}) extends Stat
                     spacing: 3,
                     children: [
                       Text('Watch in Any Browser', style: theme.textTheme.titleMedium?.copyWith(fontWeight: .w700)),
-                      Text('No app on the TV or laptop? Open a live link in any browser.', style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
+                      Text(
+                        'Stream directly into OBS Studio Browser Source (/obs) or watch in any browser.',
+                        style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+                      ),
                     ],
                   ),
                 ),
               ],
             ),
-            FilledButton.tonalIcon(onPressed: onStart, icon: const Icon(Icons.public_rounded, size: 18), label: const Text('Cast to Web Browser')),
+            FilledButton.tonalIcon(
+              onPressed: onStart,
+              icon: const Icon(Icons.public_rounded, size: 18),
+              label: const Text('Cast to Web Browser'),
+            ),
           ],
         ),
       ),
@@ -216,13 +232,19 @@ class const _LiveStatusPill({required final String label, required final Color c
   @override
   Widget build(BuildContext context) => Container(
     padding: const .symmetric(horizontal: 12, vertical: 7),
-    decoration: BoxDecoration(color: AppColors.backgroundDark.withValues(alpha: 0.74), borderRadius: .circular(999), border: Border.all(color: Colors.white.withValues(alpha: 0.16))),
+    decoration: BoxDecoration(
+      color: AppColors.backgroundDark.withValues(alpha: 0.74),
+      borderRadius: .circular(999),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+    ),
     child: Row(
       mainAxisSize: .min,
       spacing: 7,
       children: [
         Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: .circle)),
-        Flexible(child: Text(label, maxLines: 1, overflow: .ellipsis, style: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 12, fontWeight: .w600))),
+        Flexible(
+          child: Text(label, maxLines: 1, overflow: .ellipsis, style: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 12, fontWeight: .w600)),
+        ),
       ],
     ),
   );
@@ -234,41 +256,24 @@ class const _BatterySaverPill({required final bool active, required final VoidCa
     final fg = active ? AppColors.accentGreen : AppColors.textPrimaryDark;
     return Material(
       color: AppColors.backgroundDark.withValues(alpha: active ? 0.86 : 0.74),
-      shape: StadiumBorder(side: BorderSide(color: active ? AppColors.accentGreen.withValues(alpha: 0.65) : Colors.white.withValues(alpha: 0.16))),
+      shape: StadiumBorder(
+        side: BorderSide(color: active ? AppColors.accentGreen.withValues(alpha: 0.65) : Colors.white.withValues(alpha: 0.16)),
+      ),
       clipBehavior: .antiAlias,
       child: InkWell(
         onTap: onToggle,
         child: Padding(
           padding: const .symmetric(horizontal: 12, vertical: 7),
-          child: Row(mainAxisSize: .min, spacing: 6, children: [Icon(Icons.battery_saver_rounded, size: 15, color: fg), Text('Battery Saver', style: TextStyle(color: fg, fontSize: 12, fontWeight: .w600))]),
+          child: Row(
+            mainAxisSize: .min,
+            spacing: 6,
+            children: [
+              Icon(Icons.battery_saver_rounded, size: 15, color: fg),
+              Text('Battery Saver', style: TextStyle(color: fg, fontSize: 12, fontWeight: .w600)),
+            ],
+          ),
         ),
       ),
     );
   }
-}
-
-class const _EcoDimPreviewCard({required final VoidCallback onShowPreview}) extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) => Card(
-    color: AppColors.backgroundDark,
-    child: Center(
-      child: Padding(
-        padding: const .all(24),
-        child: Column(
-          mainAxisSize: .min,
-          spacing: 12,
-          children: [
-            const Icon(Icons.battery_saver_rounded, size: 48, color: AppColors.accentGreen),
-            Text('Battery Saver Active', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppColors.textPrimaryDark, fontWeight: .w700)),
-            Text(
-              'Preview is paused here to save battery and keep your phone cool. Your stream is still live!',
-              textAlign: .center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondaryDark),
-            ),
-            OutlinedButton.icon(onPressed: onShowPreview, icon: const Icon(Icons.visibility_outlined), label: const Text('Show Preview')),
-          ],
-        ),
-      ),
-    ),
-  );
 }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../../core/constants/stream_constants.dart';
+import '../../models/camera_control_state.dart';
 import '../../models/clipboard_item.dart';
 import '../../models/stream_telemetry.dart';
 import 'data_channel_helper.dart';
@@ -55,6 +56,17 @@ class WebRtcSessionService {
   /// Emits clipboard payloads received from the remote peer.
   Stream<ClipboardItem> get incomingClipboard =>
       _dataChannelHelper.incomingClipboard;
+
+  /// Emits remote camera control commands (`cam_ctrl`) received from viewer.
+  Stream<RemoteCameraCommand> get incomingCameraCommands =>
+      _dataChannelHelper.incomingCameraCommands;
+
+  /// Emits authoritative camera state (`cam_state`) snapshots from broadcaster.
+  Stream<RemoteCameraState> get incomingCameraStates =>
+      _dataChannelHelper.incomingCameraStates;
+
+  /// Emits when the `phone2screen-control` DataChannel transitions to open.
+  Stream<void> get onControlChannelOpen => _dataChannelHelper.onChannelOpen;
 
   /// Sender flow: creates peer connection, opens control DataChannel, adds
   /// tracks from [localStream], prefers H.264, and returns local SDP offer.
@@ -176,6 +188,14 @@ class WebRtcSessionService {
 
   /// Sends clipboard text across the `phone2screen-control` DataChannel.
   bool sendClipboard(String text) => _dataChannelHelper.sendClipboard(text);
+
+  /// Sends a remote camera command (`cam_ctrl`) across the control channel.
+  bool sendCameraCommand(RemoteCameraCommand cmd) =>
+      _dataChannelHelper.sendCameraCommand(cmd);
+
+  /// Sends authoritative camera state (`cam_state`) across the control channel.
+  bool sendCameraState(RemoteCameraState state) =>
+      _dataChannelHelper.sendCameraState(state);
 
   /// Reorders payload types on `m=video` to prioritize hardware H.264.
   String preferH264Codec(String sdp) => prioritizeH264InSdp(sdp);

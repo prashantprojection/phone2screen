@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
+import '../models/camera_control_state.dart';
 import '../models/clipboard_item.dart';
 import '../models/signaling_message.dart';
 import '../services/signaling/signaling_client_service.dart';
@@ -17,6 +18,7 @@ import 'settings_provider.dart';
 class SessionSignalingBridge {
   final List<StreamSubscription<dynamic>> _sessionSubs = [];
   final List<StreamSubscription<dynamic>> _webrtcSubs = [];
+  Future<void> Function(RemoteCameraCommand cmd)? _onCameraCommand;
   bool _webrtcWired = false;
 
   /// Subscribes once to [WebRtcSessionService] broadcast streams.
@@ -24,7 +26,9 @@ class SessionSignalingBridge {
     SessionContext ctx, {
     required Future<void> Function(String? errorMessage) onHostPeerFailed,
     required Future<void> Function(String? errorMessage) onSenderPeerFailed,
+    Future<void> Function(RemoteCameraCommand cmd)? onCameraCommand,
   }) {
+    _onCameraCommand = onCameraCommand ?? _onCameraCommand;
     if (_webrtcWired) return;
     _webrtcWired = true;
     final ref = ctx.sessionRef;
@@ -81,8 +85,33 @@ class SessionSignalingBridge {
         }
       }),
       ctx.webrtc.incomingClipboard.listen((item) => _onClipboard(ctx, item)),
+      ..._buildCameraControlSubs(ctx),
     ]);
   }
+
+  List<StreamSubscription<dynamic>> _buildCameraControlSubs(
+    SessionContext ctx,
+  ) => [
+    ctx.webrtc.incomingCameraCommands.listen((cmd) {
+      if (!ctx.isNotifierMounted || ctx.activeSessionId == null) return;
+      // Only a broadcasting Sender or WebBroadcast applies incoming cam_ctrl frames.
+      final isBroadcaster = !ctx.isHosting || ctx.currentState.isWebBroadcast;
+      if (!isBroadcaster) return;
+      final handler = _onCameraCommand ?? ctx.applyLocalCameraCommand;
+      unawaited(handler(cmd));
+    }),
+    ctx.webrtc.incomingCameraStates.listen((camState) {
+      if (!ctx.isNotifierMounted) return;
+      // Mirror authoritative broadcaster camera state into Receiver HUD state.
+      ctx.currentState = ctx.currentState.copyWith(remoteCameraState: camState);
+    }),
+    ctx.webrtc.onControlChannelOpen.listen((_) {
+      if (!ctx.isNotifierMounted || ctx.activeSessionId == null) return;
+      // Publish initial lens, torch, mute, and hardware support on channel open.
+      final isBroadcaster = !ctx.isHosting || ctx.currentState.isWebBroadcast;
+      if (isBroadcaster) ctx.publishCurrentCameraState();
+    }),
+  ];
 
   void _onClipboard(SessionContext ctx, ClipboardItem item) {
     if (!ctx.isNotifierMounted) return;
@@ -180,7 +209,9 @@ class SessionSignalingBridge {
     switch (msg.type) {
       case .hello:
         final rawName = (msg.payload['deviceName'] as String?)?.trim();
-        await onHello((rawName == null || rawName.isEmpty) ? 'Sender' : rawName);
+        await onHello(
+          (rawName == null || rawName.isEmpty) ? 'Sender' : rawName,
+        );
       case .offer:
         final sdp = msg.payload['sdp'] as String?;
         final type = (msg.payload['type'] as String?) ?? 'offer';

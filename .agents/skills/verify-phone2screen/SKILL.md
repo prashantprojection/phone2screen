@@ -1,17 +1,18 @@
 ---
 name: verify-phone2screen
-description: Verification runbook for Phone2Screen v0.1 with PowerShell checks for the <350-line file cap, banned Flutter Material/Cupertino imports and codegen packages, flutter analyze, flutter test, and flutter build windows --debug.
+description: Verification runbook for Phone2Screen v0.2 with PowerShell checks for the <350-line file cap, banned Flutter Material/Cupertino/private-window imports and codegen packages, flutter analyze, flutter test, and flutter build windows --debug.
 ---
 
-# Verify Phone2Screen
+# Verify Phone2Screen (v0.2)
 
-Run all steps from the workspace root (`d:\personal projects\phone2screen`) in Windows PowerShell. Never inspect or modify files outside this directory.
+Run all steps from the workspace root (`d:\personal projects\phone2screen`) in Windows PowerShell. Never inspect, scan, or modify files outside this directory (test temporary files MUST reside under `.dart_tool/test_tmp_*` inside the workspace and be removed in `addTearDown`).
 
-## 1. File Size Cap (`< 350` Lines for `.dart` & `.kt`)
+## Gate 1: File Size Cap (`< 350` Lines for `.dart` & `.kt`)
 
-Every `.dart` file in `lib/` and `test/`, plus every `.kt` file in `android/app/src/main/kotlin/`, MUST be strictly under 350 lines:
+Every `.dart` file in `lib/` and `test/`, plus every `.kt` file in `android/app/src/main/kotlin/`, MUST be strictly under 350 lines (`>= 350` fails):
 
 ```powershell
+powershell -ExecutionPolicy Bypass -File .agents/skills/verify-phone2screen/scripts/check_project.ps1
 $oversized = Get-ChildItem lib, test, android\app\src\main\kotlin -Recurse -Include *.dart,*.kt -ErrorAction SilentlyContinue |
   ForEach-Object {
     $lines = [System.IO.File]::ReadAllLines($_.FullName).Length
@@ -20,25 +21,25 @@ $oversized = Get-ChildItem lib, test, android\app\src\main\kotlin -Recurse -Incl
 if ($oversized) { $oversized; exit 1 } else { "PASS: all .dart/.kt files < 350 lines" }
 ```
 
-## 2. Deprecated Import & Zero-Codegen Gate
+## Gate 2: Banned Import & Zero-Codegen Scan
 
-Confirm zero occurrences of `package:flutter/material.dart`, `package:flutter/cupertino.dart`, `flutter_screenutil`, generated parts (`*.g.dart` / `*.freezed.dart`), or codegen packages (`build_runner`, `freezed`, `json_serializable`, `riverpod_generator`, `mockito`, `pigeon`):
+Confirm zero occurrences of `package:flutter/material.dart`, `package:flutter/cupertino.dart`, `package:flutter/src/widgets/_window.dart`, `flutter_screenutil`, `Directory.systemTemp`, generated parts (`*.g.dart` / `*.freezed.dart`), or codegen packages (`build_runner`, `freezed`, `json_serializable`, `riverpod_generator`, `riverpod_annotation`, `mockito`, `pigeon`):
 
 ```powershell
 $badDart = Get-ChildItem lib, test -Recurse -Filter *.dart -ErrorAction SilentlyContinue |
-  Select-String -Pattern 'package:flutter/(material|cupertino)\.dart|flutter_screenutil|part\s+.*\.(g|freezed)\.dart'
+  Select-String -Pattern 'package:flutter/(material|cupertino)\.dart|package:flutter/src/widgets/_window\.dart|flutter_screenutil|Directory\.systemTemp|part\s+.*\.(g|freezed)\.dart'
 $badPub = Select-String -Path pubspec.yaml `
-  -Pattern 'build_runner|freezed|json_serializable|riverpod_generator|mockito|pigeon|flutter_screenutil'
+  -Pattern 'build_runner|freezed|json_serializable|riverpod_generator|riverpod_annotation|mockito|pigeon|flutter_screenutil'
 if ($badDart -or $badPub) {
   $badDart | ForEach-Object { "$($_.Path):$($_.LineNumber): $($_.Line.Trim())" }
   $badPub  | ForEach-Object { "pubspec.yaml:$($_.LineNumber): $($_.Line.Trim())" }
   exit 1
 } else {
-  "PASS: no banned imports or codegen dependencies"
+  "PASS: no banned imports, private window APIs, systemTemp, or codegen dependencies"
 }
 ```
 
-## 3. Dependency Sync & Static Analysis
+## Gate 3: Dependency Sync & Static Analysis
 
 Ensure dependencies resolve and static analysis finishes with zero errors, warnings, or lint infos:
 
@@ -47,27 +48,27 @@ flutter pub get
 flutter analyze --fatal-infos
 ```
 
-## 4. Unit & Widget Tests
+## Gate 4: Unit & Widget Tests
 
-Run the full handwritten test suite:
+Run the full handwritten unit, loopback HTTP/WS, multi-cam, and widget test suite:
 
 ```powershell
 flutter test
 ```
 
-## 5. Windows Desktop Build Check
+## Gate 5: Windows Desktop Build Check
 
-Verify the Windows desktop receiver compiles cleanly in debug mode:
+Verify the Windows desktop multi-window receiver compiles cleanly in debug mode (`build\windows\x64\runner\Debug\phone2screen.exe`):
 
 ```powershell
 flutter build windows --debug
 ```
 
-## 6. Pass Criteria
+## Pass Criteria
 
 Report PASS only when all 5 gates exit `0`:
 1. Zero `.dart` or `.kt` files `>= 350` lines.
-2. Zero banned imports or codegen dependencies.
-3. `flutter analyze --fatal-infos` prints `No issues found!`.
-4. `flutter test` passes all tests without skipped/relaxed assertions.
-5. `flutter build windows --debug` succeeds.
+2. Zero banned imports, private window imports, `Directory.systemTemp` usage, or codegen dependencies.
+3. `flutter pub get` and `flutter analyze --fatal-infos` print `No issues found!`.
+4. `flutter test` passes 100% of tests with zero overflow errors or pending timers.
+5. `flutter build windows --debug` produces `build\windows\x64\runner\Debug\phone2screen.exe`.

@@ -12,8 +12,61 @@ final RegExp _ethernetPattern = RegExp(
   r'(^|[^a-z0-9])(eth\d*|ethernet|en\d+|eno\d+|enp\w*|ens\d+)([^a-z0-9]|$)',
 );
 
+/// Returns `true` when [name] or [address] identifies a physical USB-tethered
+/// network link (Android RNDIS/192.168.42.*, CDC/NCM, or Apple Mobile Device),
+/// excluding virtual/VPN tunnel adapters.
+bool isUsbTetherInterface(String name, String address) {
+  final lower = name.toLowerCase();
+  if (_isVirtualAdapter(lower)) return false;
+  return lower.contains('rndis') ||
+      lower.contains('usb') ||
+      lower.contains('ncm') ||
+      lower.contains('cdc') ||
+      lower.contains('apple mobile device') ||
+      lower.contains('iphone') ||
+      address.startsWith('192.168.42.');
+}
+
+/// Scores a candidate IPv4 interface for LAN streaming reliability.
+///
+/// USB tethering (`+550`) ranks above Wi-Fi (`+300/+150`) and Ethernet (`+250`),
+/// while virtual/tunnel adapters are demoted (`-1000`).
+int scoreNetworkInterface({
+  required String name,
+  required String address,
+  String? wifiIp,
+}) {
+  final lower = name.toLowerCase();
+
+  // Virtual/tunnel adapters (WSL, Hyper-V, Docker, VPNs) often hold RFC1918
+  // subnets unreachable from phones on the LAN, so demote them below physical NICs.
+  if (_isVirtualAdapter(lower)) {
+    return -1000 + _rfc1918Bonus(address);
+  }
+
+  var score = 100 + _rfc1918Bonus(address);
+
+  // USB tethering provides a dedicated wired point-to-point link with much
+  // lower jitter and higher sustained bitrate than shared Wi-Fi, so rank it highest.
+  if (isUsbTetherInterface(name, address)) {
+    score += 550;
+  } else if (_isWifiName(lower)) {
+    score += 300;
+    // Reward the OS-reported active Wi-Fi IP so secondary interfaces don't win.
+    if (wifiIp != null && address == wifiIp) {
+      score += 150;
+    }
+  } else if (_ethernetPattern.hasMatch(lower)) {
+    score += 250;
+  } else if (wifiIp != null && address == wifiIp) {
+    score += 150;
+  }
+
+  return score;
+}
+
 /// Enumerates local IPv4 interfaces, filtering unusable addresses and ranking
-/// physical RFC1918 Wi-Fi/Ethernet adapters above virtual tunnels.
+/// USB tethering, physical RFC1918 Wi-Fi/Ethernet adapters above virtual tunnels.
 Future<List<NetworkInterfaceInfo>> listInterfaces() async {
   String? wifiIp;
   try {
@@ -38,17 +91,19 @@ Future<List<NetworkInterfaceInfo>> listInterfaces() async {
         final ip = addr.address;
         if (!_isUsableIpv4(ip)) continue;
 
-        final score = _scoreInterface(
+        final score = scoreNetworkInterface(
           name: iface.name,
           address: ip,
           wifiIp: wifiIp,
         );
+        final usb = isUsbTetherInterface(iface.name, ip);
         final existing = byIp[ip];
         if (existing == null || score > existing.score) {
           byIp[ip] = _ScoredInterface(
             name: iface.name,
             address: ip,
             score: score,
+            isUsbTethered: usb,
           );
         }
       }
@@ -62,7 +117,12 @@ Future<List<NetworkInterfaceInfo>> listInterfaces() async {
     byIp[wifiIp] = _ScoredInterface(
       name: 'Wi-Fi',
       address: wifiIp,
-      score: _scoreInterface(name: 'Wi-Fi', address: wifiIp, wifiIp: wifiIp),
+      score: scoreNetworkInterface(
+        name: 'Wi-Fi',
+        address: wifiIp,
+        wifiIp: wifiIp,
+      ),
+      isUsbTethered: isUsbTetherInterface('Wi-Fi', wifiIp),
     );
   }
 
@@ -82,6 +142,7 @@ Future<List<NetworkInterfaceInfo>> listInterfaces() async {
         name: sorted[i].name,
         address: sorted[i].address,
         isPreferred: i == 0,
+        isUsbTethered: sorted[i].isUsbTethered,
       ),
   ];
 }
@@ -101,36 +162,6 @@ bool _isUsableIpv4(String ip) {
   if (ip == '0.0.0.0' || a == 127) return false;
   if (a == 169 && b == 254) return false;
   return true;
-}
-
-int _scoreInterface({
-  required String name,
-  required String address,
-  String? wifiIp,
-}) {
-  final lower = name.toLowerCase();
-
-  // Virtual/tunnel adapters (WSL, Hyper-V, Docker, VPNs) often hold RFC1918
-  // subnets unreachable from phones on the LAN, so demote them below physical NICs.
-  if (_isVirtualAdapter(lower)) {
-    return -1000 + _rfc1918Bonus(address);
-  }
-
-  var score = 100 + _rfc1918Bonus(address);
-
-  if (_isWifiName(lower)) {
-    score += 300;
-    // Reward the OS-reported active Wi-Fi IP so secondary interfaces don't win.
-    if (wifiIp != null && address == wifiIp) {
-      score += 150;
-    }
-  } else if (_ethernetPattern.hasMatch(lower)) {
-    score += 250;
-  } else if (wifiIp != null && address == wifiIp) {
-    score += 150;
-  }
-
-  return score;
 }
 
 bool _isVirtualAdapter(String lowerName) {
@@ -188,4 +219,5 @@ class const _ScoredInterface({
   required final String name,
   required final String address,
   required final int score,
+  required final bool isUsbTethered,
 });

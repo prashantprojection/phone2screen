@@ -23,6 +23,7 @@ class MainActivity : FlutterActivity() {
                     stopService(Intent(this, MediaProjectionService::class.java))
                     result.success(true)
                 }
+                "getFilesDir" -> result.success(filesDir.absolutePath)
                 else -> result.notImplemented()
             }
         }

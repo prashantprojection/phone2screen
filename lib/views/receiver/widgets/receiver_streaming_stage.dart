@@ -3,15 +3,17 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../models/viewer_display_config.dart';
+import '../../../providers/multi_cam_provider.dart';
 import '../../../providers/session_provider.dart';
 import '../../../providers/settings_provider.dart';
 import '../../shared/error_banner.dart';
 import '../../shared/video_stage_widget.dart';
 import 'fullscreen_stage_view.dart';
+import 'multi_cam_grid_view.dart';
 import 'receiver_controls_bar.dart';
 import 'telemetry_overlay.dart';
 
-/// Active receiver video stage supporting windowed controls and immersive fullscreen.
+/// Active receiver video stage supporting windowed multi-cam, OBS Clean View, and fullscreen.
 class const ReceiverStreamingStage({
   super.key,
   required final SessionState session,
@@ -34,6 +36,33 @@ class const ReceiverStreamingStage({
       .reconnecting => 'Reconnecting to sender...',
       _ => 'Waiting for video stream...',
     };
+    final multiCam = ref.watch(multiCamProvider);
+    final selectedSlot = multiCam.selectedPeerId != null
+        ? multiCam.secondarySlots[multiCam.selectedPeerId]
+        : null;
+    final activeStream = selectedSlot?.stream ?? session.remoteStream;
+    final activeDisplay = (selectedSlot?.displayConfig ?? display).copyWith(
+      cleanFeedMode: display.cleanFeedMode,
+      audioMuted: display.audioMuted || (selectedSlot?.displayConfig.audioMuted ?? false),
+    );
+
+    if (display.cleanFeedMode) {
+      return SizedBox.expand(
+        child: ColoredBox(
+          color: Colors.black,
+          child: GestureDetector(
+            behavior: .opaque,
+            onDoubleTap: () => ref.read(viewerDisplayProvider.notifier).setCleanFeed(false),
+            child: VideoStageWidget(
+              stream: activeStream,
+              displayConfig: activeDisplay,
+              borderRadius: 0,
+              waitingLabel: waitingLabel,
+            ),
+          ),
+        ),
+      );
+    }
 
     return Column(
       children: [
@@ -45,41 +74,43 @@ class const ReceiverStreamingStage({
         Expanded(
           child: Padding(
             padding: const .fromLTRB(16, 12, 16, 8),
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: GestureDetector(
-                    behavior: .opaque,
-                    onDoubleTap: () =>
-                        ref.read(viewerDisplayProvider.notifier).toggleFullscreen(),
-                    child: VideoStageWidget(
-                      stream: session.remoteStream,
-                      displayConfig: display,
-                      waitingLabel: waitingLabel,
-                    ),
+            child: multiCam.secondarySlots.isNotEmpty
+                ? MultiCamGridView(session: session, display: display)
+                : Stack(
+                    children: [
+                      Positioned.fill(
+                        child: GestureDetector(
+                          behavior: .opaque,
+                          onDoubleTap: () =>
+                              ref.read(viewerDisplayProvider.notifier).toggleFullscreen(),
+                          child: VideoStageWidget(
+                            stream: session.remoteStream,
+                            displayConfig: display,
+                            waitingLabel: waitingLabel,
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 12,
+                        left: 12,
+                        right: 12,
+                        child: IgnorePointer(
+                          child: Wrap(
+                            alignment: .spaceBetween,
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              display.showTelemetry
+                                  ? TelemetryOverlay(telemetry: session.telemetry)
+                                  : const SizedBox.shrink(),
+                              if (session.connectedPeerName != null)
+                                _PeerBadge(name: session.connectedPeerName!),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                Positioned(
-                  top: 12,
-                  left: 12,
-                  right: 12,
-                  child: IgnorePointer(
-                    child: Wrap(
-                      alignment: .spaceBetween,
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        display.showTelemetry
-                            ? TelemetryOverlay(telemetry: session.telemetry)
-                            : const SizedBox.shrink(),
-                        if (session.connectedPeerName != null)
-                          _PeerBadge(name: session.connectedPeerName!),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
         const Padding(

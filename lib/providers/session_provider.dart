@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/camera_control_state.dart';
 import '../models/clipboard_item.dart';
 import '../models/device_role.dart';
 import '../models/media_source_type.dart';
@@ -128,12 +129,10 @@ class SessionNotifier extends Notifier<SessionState> implements SessionContext {
   Future<void> stopHosting() => _hostFlow.stopHosting(this);
 
   /// Hosts a local web viewer page so any browser on Wi-Fi can watch Sender.
-  Future<void> startWebBroadcast() =>
-      _webBroadcastFlow.startWebBroadcast(this);
+  Future<void> startWebBroadcast() => _webBroadcastFlow.startWebBroadcast(this);
 
   /// Stops the Sender's local browser broadcast and releases camera/screen.
-  Future<void> stopWebBroadcast() =>
-      _webBroadcastFlow.stopWebBroadcast(this);
+  Future<void> stopWebBroadcast() => _webBroadcastFlow.stopWebBroadcast(this);
 
   /// Starts UDP LAN discovery listener for Sender mode.
   Future<void> startDiscovery() async {
@@ -176,34 +175,90 @@ class SessionNotifier extends Notifier<SessionState> implements SessionContext {
       mediaCapture.getDesktopSources();
 
   /// Switches front/back camera during an active camera broadcast.
-  Future<void> switchCamera() async {
-    if (!await mediaCapture.switchCamera() || !ref.mounted) return;
-    final current = ref.read(streamConfigProvider).cameraLens;
-    ref
-        .read(streamConfigProvider.notifier)
-        .setCameraLens(current == .front ? .back : .front);
-  }
+  Future<void> switchCamera() =>
+      applyLocalCameraCommand(const RemoteCameraCommand(command: .flip));
 
   /// Mutes or unmutes outgoing microphone audio.
   void toggleMicMute() {
     final nextMuted = !state.isMicMuted;
     mediaCapture.setMicMuted(nextMuted);
-    state = state.copyWith(isMicMuted: nextMuted);
+    _syncCameraState(
+      state.remoteCameraState.copyWith(micMuted: nextMuted),
+      isMicMuted: nextMuted,
+    );
   }
 
   /// Toggles the mobile camera flash torch when supported.
-  Future<void> toggleTorch() async {
-    final nextTorch = !state.isTorchOn;
-    if (await mediaCapture.toggleTorch(nextTorch) && ref.mounted) {
-      state = state.copyWith(isTorchOn: nextTorch);
-    }
-  }
+  Future<void> toggleTorch() =>
+      applyLocalCameraCommand(const RemoteCameraCommand(command: .torch));
 
   /// Switches between camera and screen share, replacing track seamlessly.
   Future<void> changeSource(
     MediaSourceType source, {
     String? desktopSourceId,
-  }) => _senderFlow.changeSource(this, source, desktopSourceId: desktopSourceId);
+  }) async {
+    await _senderFlow.changeSource(
+      this,
+      source,
+      desktopSourceId: desktopSourceId,
+    );
+    if (!ref.mounted) return;
+    _syncCameraState(
+      state.remoteCameraState.copyWith(
+        torchOn: state.isTorchOn,
+        zoom: 1.0,
+        exposureOffset: 0.0,
+        focusLocked: false,
+        controlsSupported:
+            source == .camera && mediaCapture.isCameraControlPlatform,
+      ),
+    );
+  }
+
+  /// Sends a remote camera command (`cam_ctrl`) from the Receiver HUD.
+  bool sendRemoteCameraCommand(RemoteCameraCommand cmd) =>
+      webrtc.sendCameraCommand(cmd);
+
+  @override
+  void publishCurrentCameraState() {
+    if (!ref.mounted) return;
+    final cfg = ref.read(streamConfigProvider);
+    _syncCameraState(
+      state.remoteCameraState.copyWith(
+        lens: cfg.cameraLens,
+        torchOn: state.isTorchOn,
+        micMuted: state.isMicMuted,
+        controlsSupported:
+            cfg.sourceType == .camera && mediaCapture.isCameraControlPlatform,
+      ),
+    );
+  }
+
+  @override
+  Future<void> applyLocalCameraCommand(RemoteCameraCommand cmd) async {
+    if (!ref.mounted) return;
+    final currentLens = ref.read(streamConfigProvider).cameraLens;
+    final prev = state.remoteCameraState.copyWith(lens: currentLens);
+    final next = await mediaCapture.applyCameraCommand(cmd, prev);
+    if (!ref.mounted) return;
+    if (next.lens != currentLens) {
+      ref.read(streamConfigProvider.notifier).setCameraLens(next.lens);
+    }
+    _syncCameraState(next, isMicMuted: next.micMuted, isTorchOn: next.torchOn);
+  }
+
+  void _syncCameraState(
+    RemoteCameraState camState, {
+    bool? isMicMuted,
+    bool? isTorchOn,
+  }) {
+    state = state.copyWith(
+      remoteCameraState: camState,
+      isMicMuted: isMicMuted,
+      isTorchOn: isTorchOn,
+    );
+    if (!_isHosting || state.isWebBroadcast) webrtc.sendCameraState(camState);
+  }
 
   /// Sends clipboard text over the active WebRTC control DataChannel.
   void sendClipboardText(String text) {

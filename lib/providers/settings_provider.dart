@@ -2,11 +2,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/constants/stream_constants.dart';
+import '../models/camera_rig_preset.dart';
 import '../models/media_source_type.dart';
 import '../models/stream_config.dart';
 import '../models/viewer_display_config.dart';
 
-/// Persistent-style application preferences for hosting, pairing, and UI theme.
+/// Persistent application preferences for hosting, pairing, and UI theme.
 class const AppSettings({
   final ThemeMode themeMode = .dark,
   final int preferredPort = StreamConstants.defaultSignalingPort,
@@ -14,22 +15,40 @@ class const AppSettings({
   final bool autoCopyClipboard = true,
   final bool ecoDimPreview = false,
 }) {
-  /// Returns an updated copy of [AppSettings].
+  Map<String, dynamic> toJson() => {
+    'themeMode': themeMode.name,
+    'preferredPort': preferredPort,
+    'pin': pin,
+    'autoCopyClipboard': autoCopyClipboard,
+    'ecoDimPreview': ecoDimPreview,
+  };
+
+  static AppSettings fromJson(Map<String, dynamic> json) {
+    final rawPort = json['preferredPort'];
+    return AppSettings(
+      themeMode: _parseEnum(ThemeMode.values, json['themeMode']) ?? .dark,
+      preferredPort: rawPort is num
+          ? rawPort.toInt().clamp(0, 65535)
+          : StreamConstants.defaultSignalingPort,
+      pin: json['pin'] is String ? (json['pin'] as String).trim() : '',
+      autoCopyClipboard: (json['autoCopyClipboard'] as bool?) ?? true,
+      ecoDimPreview: (json['ecoDimPreview'] as bool?) ?? false,
+    );
+  }
+
   AppSettings copyWith({
     ThemeMode? themeMode,
     int? preferredPort,
     String? pin,
     bool? autoCopyClipboard,
     bool? ecoDimPreview,
-  }) {
-    return AppSettings(
-      themeMode: themeMode ?? this.themeMode,
-      preferredPort: preferredPort ?? this.preferredPort,
-      pin: pin ?? this.pin,
-      autoCopyClipboard: autoCopyClipboard ?? this.autoCopyClipboard,
-      ecoDimPreview: ecoDimPreview ?? this.ecoDimPreview,
-    );
-  }
+  }) => AppSettings(
+    themeMode: themeMode ?? this.themeMode,
+    preferredPort: preferredPort ?? this.preferredPort,
+    pin: pin ?? this.pin,
+    autoCopyClipboard: autoCopyClipboard ?? this.autoCopyClipboard,
+    ecoDimPreview: ecoDimPreview ?? this.ecoDimPreview,
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -43,13 +62,49 @@ class const AppSettings({
           ecoDimPreview == other.ecoDimPreview;
 
   @override
-  int get hashCode => Object.hash(
-    themeMode,
-    preferredPort,
-    pin,
-    autoCopyClipboard,
-    ecoDimPreview,
+  int get hashCode =>
+      Object.hash(themeMode, preferredPort, pin, autoCopyClipboard, ecoDimPreview);
+}
+
+/// Serializes [StreamConfig] to a JSON map for local preference persistence.
+Map<String, dynamic> streamConfigToJson(StreamConfig config) => {
+  'resolution': config.resolution.name,
+  'frameRate': config.frameRate,
+  'videoBitrate': config.videoBitrate,
+  'enableAudio': config.enableAudio,
+  'cameraLens': config.cameraLens.name,
+  'sourceType': config.sourceType.name,
+  if (config.desktopSourceId != null) 'desktopSourceId': config.desktopSourceId,
+};
+
+/// Deserializes a [StreamConfig] from [json], falling back safely on bad values.
+StreamConfig streamConfigFromJson(Map<String, dynamic> json) {
+  final rawFps = json['frameRate'];
+  final rawBitrate = json['videoBitrate'];
+  return StreamConfig(
+    resolution: _parseEnum(StreamResolution.values, json['resolution']) ?? .p1080,
+    frameRate: rawFps is num && rawFps.toInt() > 0 ? rawFps.toInt() : 30,
+    videoBitrate: rawBitrate is num
+        ? rawBitrate.toInt().clamp(
+            StreamConstants.minVideoBitrate,
+            StreamConstants.maxVideoBitrate,
+          )
+        : StreamConstants.defaultVideoBitrate,
+    enableAudio: (json['enableAudio'] as bool?) ?? true,
+    cameraLens: _parseEnum(CameraLens.values, json['cameraLens']) ?? .back,
+    sourceType: _parseEnum(MediaSourceType.values, json['sourceType']) ?? .camera,
+    desktopSourceId: json['desktopSourceId'] is String
+        ? json['desktopSourceId'] as String
+        : null,
   );
+}
+
+T? _parseEnum<T extends Enum>(List<T> values, Object? raw) {
+  if (raw is! String) return null;
+  for (final v in values) {
+    if (v.name == raw) return v;
+  }
+  return null;
 }
 
 /// Global application settings provider.
@@ -62,22 +117,19 @@ class AppSettingsNotifier extends Notifier<AppSettings> {
   @override
   AppSettings build() => const AppSettings();
 
-  /// Sets the app [ThemeMode].
+  void replace(AppSettings next) => state = next;
+
   void setThemeMode(ThemeMode themeMode) =>
       state = state.copyWith(themeMode: themeMode);
 
-  /// Sets preferred HTTP/WS signaling port within valid TCP bounds.
   void setPreferredPort(int port) =>
       state = state.copyWith(preferredPort: port.clamp(0, 65535));
 
-  /// Sets optional pairing PIN (empty string disables PIN requirement).
   void setPin(String pin) => state = state.copyWith(pin: pin.trim());
 
-  /// Toggles automatic OS clipboard copying for incoming DataChannel text.
   void setAutoCopyClipboard(bool enabled) =>
       state = state.copyWith(autoCopyClipboard: enabled);
 
-  /// Toggles Eco Dim Preview to unmount local video preview while streaming.
   void setEcoDimPreview(bool enabled) =>
       state = state.copyWith(ecoDimPreview: enabled);
 }
@@ -93,22 +145,20 @@ class StreamConfigNotifier extends Notifier<StreamConfig> {
   @override
   StreamConfig build() => const StreamConfig();
 
-  /// Updates target capture resolution and scales default bitrate if unchanged.
+  void replace(StreamConfig next) => state = next;
+
+  void applyPreset(CameraRigPreset preset) => state = preset.applyTo(state);
+
   void setResolution(StreamResolution resolution) {
     final nextBitrate = state.videoBitrate == state.resolution.recommendedBitrate
         ? resolution.recommendedBitrate
         : state.videoBitrate;
-    state = state.copyWith(
-      resolution: resolution,
-      videoBitrate: nextBitrate,
-    );
+    state = state.copyWith(resolution: resolution, videoBitrate: nextBitrate);
   }
 
-  /// Updates target video frame rate (`30` or `60`).
   void setFrameRate(int frameRate) =>
       state = state.copyWith(frameRate: frameRate);
 
-  /// Updates target maximum video bitrate clamped to protocol limits.
   void setBitrate(int bitrate) => state = state.copyWith(
     videoBitrate: bitrate.clamp(
       StreamConstants.minVideoBitrate,
@@ -116,19 +166,15 @@ class StreamConfigNotifier extends Notifier<StreamConfig> {
     ),
   );
 
-  /// Selects camera vs screen sharing source.
   void setSourceType(MediaSourceType sourceType) =>
       state = state.copyWith(sourceType: sourceType);
 
-  /// Selects front vs back camera lens.
   void setCameraLens(CameraLens cameraLens) =>
       state = state.copyWith(cameraLens: cameraLens);
 
-  /// Toggles audio capture inclusion for outgoing streams.
   void setEnableAudio(bool enableAudio) =>
       state = state.copyWith(enableAudio: enableAudio);
 
-  /// Selects or clears the desktop screen/window source ID.
   void setDesktopSourceId(String? id) => state = state.copyWith(
     desktopSourceId: id,
     clearDesktopSource: id == null,
@@ -141,25 +187,20 @@ final viewerDisplayProvider =
       ViewerDisplayNotifier.new,
     );
 
-/// Notifier managing receiver fit, mirror, rotation, mute, and fullscreen state.
+/// Notifier managing receiver fit, mirror, rotation, framing, color, and HUD.
 class ViewerDisplayNotifier extends Notifier<ViewerDisplayConfig> {
   @override
   ViewerDisplayConfig build() => const ViewerDisplayConfig();
 
-  /// Toggles `contain` vs `cover` scaling on the receiver stage.
   void toggleFit() => state = state.copyWith(coverFit: !state.coverFit);
 
-  /// Mirrors the received video horizontally.
   void toggleMirror() => state = state.copyWith(mirrored: !state.mirrored);
 
-  /// Rotates the receiver video viewport clockwise by 90 degrees.
   void rotate90() =>
       state = state.copyWith(quarterTurns: (state.quarterTurns + 1) % 4);
 
-  /// Mutes or unmutes receiver playback audio.
   void toggleMute() => state = state.copyWith(audioMuted: !state.audioMuted);
 
-  /// Toggles immersive fullscreen receiver display, revealing HUD controls on entry.
   void toggleFullscreen() {
     final next = !state.isFullscreen;
     state = state.copyWith(
@@ -168,24 +209,55 @@ class ViewerDisplayNotifier extends Notifier<ViewerDisplayConfig> {
     );
   }
 
-  /// Explicitly sets immersive fullscreen state, revealing HUD controls on entry.
   void setFullscreen(bool value) => state = state.copyWith(
     isFullscreen: value,
     fullscreenHudVisible: value ? true : state.fullscreenHudVisible,
   );
 
-  /// Shows or hides floating overlay controls while in fullscreen.
   void toggleFullscreenHud() =>
       state = state.copyWith(fullscreenHudVisible: !state.fullscreenHudVisible);
 
-  /// Explicitly shows or hides floating overlay controls while in fullscreen.
   void setFullscreenHudVisible(bool visible) =>
       state = state.copyWith(fullscreenHudVisible: visible);
 
-  /// Shows or hides live telemetry overlay chips.
   void toggleTelemetry() =>
       state = state.copyWith(showTelemetry: !state.showTelemetry);
 
-  /// Restores default receiver viewport settings.
+  void toggleCleanFeed() =>
+      state = state.copyWith(cleanFeedMode: !state.cleanFeedMode);
+
+  void setCleanFeed(bool enabled) =>
+      state = state.copyWith(cleanFeedMode: enabled);
+
+  void toggleGrid() => state = state.copyWith(showGrid: !state.showGrid);
+
+  void setAspectPreset(AspectPreset preset) =>
+      state = state.copyWith(aspectPreset: preset);
+
+  void setDigitalZoom(double zoom) =>
+      state = state.copyWith(digitalZoom: zoom.clamp(1.0, 3.0));
+
+  void setPan(double x, double y) =>
+      state = state.copyWith(panX: x.clamp(-1.0, 1.0), panY: y.clamp(-1.0, 1.0));
+
+  void setBrightness(double value) =>
+      state = state.copyWith(brightness: value.clamp(-0.5, 0.5));
+
+  void setContrast(double value) =>
+      state = state.copyWith(contrast: value.clamp(0.5, 1.5));
+
+  void setSaturation(double value) =>
+      state = state.copyWith(saturation: value.clamp(0.0, 2.0));
+
+  void resetFramingAndColor() => state = state.copyWith(
+    aspectPreset: .free,
+    digitalZoom: 1.0,
+    panX: 0.0,
+    panY: 0.0,
+    brightness: 0.0,
+    contrast: 1.0,
+    saturation: 1.0,
+  );
+
   void reset() => state = const ViewerDisplayConfig();
 }

@@ -4,28 +4,46 @@ import 'package:flutter_webrtc/flutter_webrtc.dart' show MediaStream;
 import 'package:material_ui/material_ui.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../../core/constants/stream_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../providers/session_provider.dart';
+import '../../../providers/settings_provider.dart';
 import '../../shared/error_banner.dart';
 import '../../shared/video_stage_widget.dart';
 import 'active_sender_controls.dart';
 
-/// Lobby screen while Sender hosts an HTTP web page so any browser on Wi-Fi
-/// can open or scan the QR URL and watch this device's camera/screen stream.
+/// Lobby screen while Sender hosts `/obs` Clean Feed and interactive web viewer
+/// so OBS Studio or any browser on Wi-Fi can open/scan and watch live.
 class const WebBroadcastLobbyView({super.key, required final SessionState session})
     extends ConsumerWidget {
-  Future<void> _copyUrl(BuildContext context, String url) async {
+  String _buildObsUrl(String baseUrl, {required bool requiresPin, required String pin}) {
+    if (baseUrl.isEmpty) return '';
+    final obsBase = '$baseUrl${StreamConstants.obsCleanFeedPath}';
+    if (requiresPin && pin.isNotEmpty) {
+      return '$obsBase?pin=${Uri.encodeComponent(pin)}';
+    }
+    return obsBase;
+  }
+
+  Future<void> _copyUrl(BuildContext context, String label, String url) async {
     await Clipboard.setData(ClipboardData(text: url));
     if (!context.mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(content: Text('Copied browser link')));
+      ..showSnackBar(SnackBar(content: Text('Copied $label')));
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final url = session.activeEndpoint?.browserUrl ?? '';
+    final endpoint = session.activeEndpoint;
+    final url = endpoint?.browserUrl ?? '';
+    final pin = ref.watch(appSettingsProvider).pin.trim();
+    final obsUrl = _buildObsUrl(
+      url,
+      requiresPin: endpoint?.requiresPin ?? false,
+      pin: pin,
+    );
     final stagePanel = _PreviewStage(stream: session.localStream);
 
     return Center(
@@ -48,13 +66,13 @@ class const WebBroadcastLobbyView({super.key, required final SessionState sessio
                         crossAxisAlignment: .stretch,
                         spacing: 20,
                         children: [
-                          Expanded(flex: 5, child: _buildInfoCard(context, url)),
+                          Expanded(flex: 5, child: _buildInfoCard(context, url, obsUrl)),
                           Expanded(flex: 6, child: stagePanel),
                         ],
                       )
                     : LayoutBuilder(
                         builder: (context, constraints) {
-                          final infoCard = _buildInfoCard(context, url);
+                          final infoCard = _buildInfoCard(context, url, obsUrl);
                           if (constraints.maxHeight < 560) {
                             return SingleChildScrollView(
                               child: Column(
@@ -68,7 +86,10 @@ class const WebBroadcastLobbyView({super.key, required final SessionState sessio
                             crossAxisAlignment: .stretch,
                             spacing: 12,
                             children: [
-                              ConstrainedBox(constraints: BoxConstraints(maxHeight: constraints.maxHeight * 0.62), child: infoCard),
+                              ConstrainedBox(
+                                constraints: BoxConstraints(maxHeight: constraints.maxHeight * 0.64),
+                                child: infoCard,
+                              ),
                               Expanded(child: stagePanel),
                             ],
                           );
@@ -83,90 +104,151 @@ class const WebBroadcastLobbyView({super.key, required final SessionState sessio
     );
   }
 
-  Widget _buildInfoCard(BuildContext context, String url) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final qrSize = context.isCompact ? 138.0 : 180.0;
+  Widget _buildInfoCard(BuildContext context, String url, String obsUrl) {
+    final qrSize = context.isCompact ? 128.0 : 164.0;
 
     return Card(
       child: SingleChildScrollView(
         padding: .all(context.isCompact ? 14 : 20),
         child: Column(
-          crossAxisAlignment: .center,
+          crossAxisAlignment: .stretch,
           spacing: 12,
           children: [
-            Container(
-              padding: const .symmetric(horizontal: 11, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppColors.accentGreen.withValues(alpha: 0.14),
-                borderRadius: .circular(999),
-                border: Border.all(color: AppColors.accentGreen.withValues(alpha: 0.4)),
-              ),
-              child: const Row(
-                mainAxisSize: .min,
-                spacing: 6,
-                children: [
-                  Icon(Icons.public_rounded, size: 15, color: AppColors.accentGreen),
-                  Text('Ready for Browser Viewer', style: TextStyle(color: AppColors.accentGreen, fontSize: 12, fontWeight: .w700)),
-                ],
+            Center(
+              child: Container(
+                padding: const .symmetric(horizontal: 11, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.accentGreen.withValues(alpha: 0.14),
+                  borderRadius: .circular(999),
+                  border: Border.all(color: AppColors.accentGreen.withValues(alpha: 0.4)),
+                ),
+                child: const Row(
+                  mainAxisSize: .min,
+                  spacing: 6,
+                  children: [
+                    Icon(Icons.public_rounded, size: 15, color: AppColors.accentGreen),
+                    Text(
+                      'Ready for Browser Viewer',
+                      style: TextStyle(color: AppColors.accentGreen, fontSize: 12, fontWeight: .w700),
+                    ),
+                  ],
+                ),
               ),
             ),
             if (url.isNotEmpty)
-              Container(
-                padding: const .all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: .circular(16),
-                  boxShadow: [BoxShadow(color: AppColors.primaryBlue.withValues(alpha: 0.12), blurRadius: 16)],
-                ),
-                child: QrImageView(data: url, size: qrSize, backgroundColor: Colors.white),
-              ),
-            Container(
-              width: double.infinity,
-              padding: const .all(12),
-              decoration: BoxDecoration(
-                color: colors.surfaceContainer,
-                borderRadius: .circular(12),
-                border: Border.all(color: colors.outlineVariant),
-              ),
-              child: const Column(
-                crossAxisAlignment: .start,
-                spacing: 7,
-                children: [
-                  _GuideStepRow(icon: Icons.wifi_rounded, text: '1. Open any browser on the same Wi-Fi'),
-                  _GuideStepRow(icon: Icons.qr_code_scanner_rounded, text: '2. Scan the QR code or visit this link:'),
-                ],
-              ),
-            ),
-            Material(
-              color: colors.surfaceContainer,
-              shape: RoundedRectangleBorder(
-                borderRadius: .circular(12),
-                side: BorderSide(color: url.isNotEmpty ? colors.primary.withValues(alpha: 0.35) : colors.outlineVariant),
-              ),
-              clipBehavior: .antiAlias,
-              child: InkWell(
-                onTap: url.isEmpty ? null : () => _copyUrl(context, url),
-                child: Padding(
-                  padding: const .symmetric(horizontal: 12, vertical: 11),
-                  child: Row(
-                    spacing: 8,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          url.isEmpty ? '--' : url,
-                          maxLines: 1,
-                          overflow: .ellipsis,
-                          style: theme.textTheme.bodyMedium?.copyWith(color: colors.primary, fontWeight: .w700),
-                        ),
-                      ),
-                      Icon(Icons.copy_rounded, size: 17, color: colors.primary),
-                    ],
+              Center(
+                child: Container(
+                  padding: const .all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: .circular(16),
+                    boxShadow: [BoxShadow(color: AppColors.primaryBlue.withValues(alpha: 0.12), blurRadius: 16)],
                   ),
+                  child: QrImageView(data: url, size: qrSize, backgroundColor: Colors.white),
                 ),
               ),
+            _CopyLinkCard(
+              title: 'OBS Browser Source (Clean Feed)',
+              badge: 'OBS',
+              subtitle: 'Zero-UI full-bleed feed with auto-reconnect',
+              url: obsUrl,
+              accent: const Color(0xFF8B5CF6),
+              secondaryAccent: AppColors.cyanAccent,
+              icon: Icons.live_tv_rounded,
+              onCopy: obsUrl.isEmpty ? null : () => _copyUrl(context, 'OBS Browser Source link', obsUrl),
+            ),
+            _CopyLinkCard(
+              title: 'Interactive Web Viewer',
+              subtitle: 'Open in any browser on Wi-Fi or scan QR above',
+              url: url,
+              accent: Theme.of(context).colorScheme.primary,
+              icon: Icons.open_in_browser_rounded,
+              onCopy: url.isEmpty ? null : () => _copyUrl(context, 'browser link', url),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class const _CopyLinkCard({
+  required final String title,
+  final String? badge,
+  required final String subtitle,
+  required final String url,
+  required final Color accent,
+  final Color? secondaryAccent,
+  required final IconData icon,
+  required final VoidCallback? onCopy,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final badgeAccent = secondaryAccent ?? accent;
+
+    return Material(
+      color: colors.surfaceContainer,
+      shape: RoundedRectangleBorder(
+        borderRadius: .circular(12),
+        side: BorderSide(color: url.isNotEmpty ? accent.withValues(alpha: 0.45) : colors.outlineVariant),
+      ),
+      clipBehavior: .antiAlias,
+      child: InkWell(
+        onTap: onCopy,
+        child: Padding(
+          padding: const .symmetric(horizontal: 12, vertical: 10),
+          child: Column(
+            crossAxisAlignment: .start,
+            spacing: 5,
+            children: [
+              Row(
+                spacing: 8,
+                children: [
+                  Icon(icon, size: 16, color: badgeAccent),
+                  Expanded(
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: .ellipsis,
+                      style: theme.textTheme.labelMedium?.copyWith(fontWeight: .w700),
+                    ),
+                  ),
+                  if (badge case final badgeText?)
+                    Container(
+                      padding: const .symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: [accent, badgeAccent]),
+                        borderRadius: .circular(999),
+                      ),
+                      child: Text(
+                        badgeText,
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: .w800),
+                      ),
+                    ),
+                ],
+              ),
+              Text(
+                subtitle,
+                style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant, fontSize: 11),
+              ),
+              Row(
+                spacing: 8,
+                children: [
+                  Expanded(
+                    child: Text(
+                      url.isEmpty ? '--' : url,
+                      maxLines: 1,
+                      overflow: .ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(color: badgeAccent, fontWeight: .w700),
+                    ),
+                  ),
+                  Icon(Icons.copy_rounded, size: 16, color: badgeAccent),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -193,26 +275,14 @@ class const _PreviewStage({required final MediaStream? stream}) extends Stateles
             spacing: 6,
             children: [
               Container(width: 7, height: 7, decoration: const BoxDecoration(color: AppColors.cyanAccent, shape: .circle)),
-              const Text('Live Preview', style: TextStyle(color: AppColors.textPrimaryDark, fontSize: 12, fontWeight: .w600)),
+              const Text(
+                'Live Preview',
+                style: TextStyle(color: AppColors.textPrimaryDark, fontSize: 12, fontWeight: .w600),
+              ),
             ],
           ),
         ),
       ),
     ],
   );
-}
-
-class const _GuideStepRow({required final IconData icon, required final String text}) extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    return Row(
-      spacing: 9,
-      children: [
-        Icon(icon, size: 16, color: colors.primary),
-        Expanded(child: Text(text, style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurface, fontWeight: .w600))),
-      ],
-    );
-  }
 }

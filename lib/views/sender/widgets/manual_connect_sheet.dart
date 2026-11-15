@@ -2,8 +2,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/constants/stream_constants.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../models/signaling_data.dart';
 import '../../../providers/session_provider.dart';
+import '../../../providers/settings_provider.dart';
 
 /// Modal bottom sheet for connecting directly via host IP/hostname, port, and PIN.
 class const ManualConnectSheet({super.key}) extends ConsumerStatefulWidget {
@@ -23,8 +25,16 @@ class const ManualConnectSheet({super.key}) extends ConsumerStatefulWidget {
 class _ManualConnectSheetState extends ConsumerState<ManualConnectSheet> {
   final _formKey = GlobalKey<FormState>();
   final _hostController = TextEditingController();
-  final _portController = TextEditingController(text: '${StreamConstants.defaultSignalingPort}');
+  late final TextEditingController _portController;
   final _pinController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    final port = ref.read(appSettingsProvider).preferredPort;
+    final initialPort = port > 0 ? port : StreamConstants.defaultSignalingPort;
+    _portController = TextEditingController(text: '$initialPort');
+  }
 
   @override
   void dispose() {
@@ -54,6 +64,8 @@ class _ManualConnectSheetState extends ConsumerState<ManualConnectSheet> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
     return Padding(
       padding: .fromLTRB(20, 20, 20, 20 + bottomInset),
       child: SingleChildScrollView(
@@ -73,7 +85,27 @@ class _ManualConnectSheetState extends ConsumerState<ManualConnectSheet> {
               ),
               Text(
                 'Only needed if your Wi-Fi blocks automatic screen discovery.',
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+              ),
+              Container(
+                padding: const .symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.accentGreen.withValues(alpha: 0.1),
+                  borderRadius: .circular(10),
+                  border: Border.all(color: AppColors.accentGreen.withValues(alpha: 0.35)),
+                ),
+                child: Row(
+                  spacing: 9,
+                  children: [
+                    const Icon(Icons.usb_rounded, size: 18, color: AppColors.accentGreen),
+                    Expanded(
+                      child: Text(
+                        'USB Tip: Run adb reverse tcp:8080 tcp:8080 or enable phone USB Tethering for fastest zero-lag stream.',
+                        style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurface),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               TextFormField(
                 controller: _hostController,

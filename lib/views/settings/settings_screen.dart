@@ -5,9 +5,10 @@ import '../../core/constants/stream_constants.dart';
 import '../../models/stream_config.dart';
 import '../../providers/settings_provider.dart';
 import '../shared/how_to_use_sheet.dart';
+import 'widgets/rig_preset_settings_card.dart';
 import 'widgets/shortcut_settings_card.dart';
 
-/// Application settings screen for theme, video & audio, shortcuts, and help.
+/// Application settings screen for theme, video & audio, presets, shortcuts, and help.
 class const SettingsScreen({super.key}) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -67,6 +68,9 @@ class const SettingsScreen({super.key}) extends ConsumerWidget {
                 ]),
               ),
               const SizedBox(height: 16),
+              _sectionHeader(theme, Icons.camera_enhance_outlined, 'Streamer Presets'),
+              const RigPresetSettingsCard(),
+              const SizedBox(height: 16),
               _sectionHeader(theme, Icons.keyboard_alt_outlined, 'Keyboard Shortcuts'),
               const ShortcutSettingsCard(),
               const SizedBox(height: 16),
@@ -103,14 +107,14 @@ class const SettingsScreen({super.key}) extends ConsumerWidget {
               Card(
                 child: _dividedColumn([
                   _tile(primary, Icons.menu_book_rounded, 'How to Use Phone2Screen',
-                      subtitle: 'Quick 3-step guide for Phone, PC & Browser',
+                      subtitle: 'Quick guide for Phone, OBS Studio & Browser',
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: () => HowToUseSheet.show(context)),
                   _tile(primary, Icons.cast_connected_rounded, 'Phone2Screen',
-                      subtitle: 'Version 0.1.0 • Private Local Wi-Fi Casting'),
+                      subtitle: 'Version 0.2.0 • Streamer Webcam Studio'),
                   _tile(primary, Icons.description_outlined, 'Open-Source Licenses',
                       trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => showLicensePage(context: context, applicationName: 'Phone2Screen', applicationVersion: '0.1.0')),
+                      onTap: () => showLicensePage(context: context, applicationName: 'Phone2Screen', applicationVersion: '0.2.0')),
                 ]),
               ),
             ],
@@ -162,7 +166,7 @@ class const SettingsScreen({super.key}) extends ConsumerWidget {
           value: value,
           min: StreamConstants.minVideoBitrate.toDouble(),
           max: StreamConstants.maxVideoBitrate.toDouble(),
-          divisions: 29,
+          divisions: 49,
           onChanged: (v) => onChanged(v.round()),
         ),
       ],

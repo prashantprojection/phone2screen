@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
@@ -7,7 +8,8 @@ import 'package:material_ui/material_ui.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/viewer_display_config.dart';
 
-/// WebRTC [MediaStream] video stage with immediate srcObject binding and transforms.
+/// WebRTC [MediaStream] video stage with immediate srcObject binding, GPU
+/// framing transforms, BT.709 color grading, and optional Rule-of-Thirds grid.
 class const VideoStageWidget({
   super.key,
   required final MediaStream? stream,
@@ -91,42 +93,129 @@ class _VideoStageWidgetState extends State<VideoStageWidget> {
     return ClipRRect(
       borderRadius: .circular(widget.borderRadius),
       child: DecoratedBox(
-        decoration: const BoxDecoration(color: AppColors.backgroundDark),
+        decoration: BoxDecoration(
+          color: config.cleanFeedMode ? Colors.black : AppColors.backgroundDark,
+        ),
         child: stream == null || !_initialized
-            ? Center(
-                child: Padding(
-                  padding: const .all(24),
-                  child: Column(
-                    mainAxisSize: .min,
-                    spacing: 12,
-                    children: [
-                      const Icon(
-                        Icons.cast_connected_rounded,
-                        size: 40,
-                        color: AppColors.primaryLight,
-                      ),
-                      Text(
-                        widget.waitingLabel,
-                        textAlign: .center,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.textSecondaryDark,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            : RotatedBox(
-                quarterTurns: config.quarterTurns % 4,
-                child: RTCVideoView(
-                  _renderer,
-                  mirror: config.mirrored,
-                  objectFit: config.coverFit
-                      ? .RTCVideoViewObjectFitCover
-                      : .RTCVideoViewObjectFitContain,
-                ),
-              ),
+            ? _WaitingPlaceholder(label: widget.waitingLabel)
+            : _buildGradedStage(config),
       ),
     );
   }
+
+  Widget _buildGradedStage(ViewerDisplayConfig config) {
+    Widget video = RotatedBox(
+      quarterTurns: config.quarterTurns % 4,
+      child: RTCVideoView(
+        _renderer,
+        mirror: config.mirrored,
+        objectFit: config.coverFit
+            ? .RTCVideoViewObjectFitCover
+            : .RTCVideoViewObjectFitContain,
+      ),
+    );
+
+    if (config.hasColorAdjustments) {
+      video = ColorFiltered(
+        colorFilter: ColorFilter.matrix(config.colorMatrix),
+        child: video,
+      );
+    }
+
+    final zoom = config.digitalZoom.clamp(1.0, 3.0);
+    final hasTransform = zoom != 1.0 || config.panX != 0.0 || config.panY != 0.0;
+    Widget framed = hasTransform
+        ? LayoutBuilder(
+            builder: (context, constraints) {
+              // Allow subtle panning even at 1.0x crop while scaling range with zoom.
+              final maxShiftX = math.max(
+                constraints.maxWidth * 0.2,
+                constraints.maxWidth * (zoom - 1.0) / 2,
+              );
+              final maxShiftY = math.max(
+                constraints.maxHeight * 0.2,
+                constraints.maxHeight * (zoom - 1.0) / 2,
+              );
+              final dx = config.panX.clamp(-1.0, 1.0) * maxShiftX;
+              final dy = config.panY.clamp(-1.0, 1.0) * maxShiftY;
+              return ClipRect(
+                child: Transform.translate(
+                  offset: Offset(dx, dy),
+                  child: Transform.scale(scale: zoom, child: video),
+                ),
+              );
+            },
+          )
+        : ClipRect(child: video);
+
+    if (config.showGrid && !config.cleanFeedMode) {
+      framed = Stack(
+        fit: .expand,
+        children: [
+          framed,
+          const IgnorePointer(child: CustomPaint(painter: _ThirdsGridPainter())),
+        ],
+      );
+    }
+
+    final ratio = config.aspectPreset.aspectRatio;
+    if (ratio != null) {
+      framed = Center(
+        child: AspectRatio(aspectRatio: ratio, child: ClipRect(child: framed)),
+      );
+    }
+    return framed;
+  }
+}
+
+class const _WaitingPlaceholder({required final String label})
+    extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const .all(24),
+        child: Column(
+          mainAxisSize: .min,
+          spacing: 12,
+          children: [
+            const Icon(
+              Icons.cast_connected_rounded,
+              size: 40,
+              color: AppColors.primaryLight,
+            ),
+            Text(
+              label,
+              textAlign: .center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondaryDark,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ThirdsGridPainter extends CustomPainter {
+  const _ThirdsGridPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white24
+      ..strokeWidth = 1.0
+      ..style = .stroke;
+
+    for (var i = 1; i <= 2; i++) {
+      final x = size.width * i / 3;
+      final y = size.height * i / 3;
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ThirdsGridPainter oldDelegate) => false;
 }

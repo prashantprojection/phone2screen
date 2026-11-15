@@ -6,15 +6,18 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../models/stream_telemetry.dart';
 import '../../../models/viewer_display_config.dart';
+import '../../../providers/multi_cam_provider.dart';
 import '../../../providers/session_provider.dart';
 import '../../../providers/settings_provider.dart';
 import '../../../providers/shortcut_provider.dart';
 import '../../shared/clipboard_sync_sheet.dart';
 import '../../shared/video_stage_widget.dart';
+import 'remote_camera_panel.dart';
 import 'telemetry_overlay.dart';
 
-/// Immersive fullscreen receiver video stage with toggleable overlay controls.
+/// Immersive fullscreen receiver stage supporting HUD controls and OBS Clean View.
 class const FullscreenStageView({
   super.key,
   required final SessionState session,
@@ -51,11 +54,27 @@ class _FullscreenStageViewState extends ConsumerState<FullscreenStageView> {
       .reconnecting => 'Reconnecting to sender...',
       _ => 'Waiting for video stream...',
     };
-    final peerName = widget.session.connectedPeerName;
-    final compactCollision = context.isCompact &&
-        widget.display.fullscreenHudVisible &&
-        (widget.display.showTelemetry || peerName != null);
+    final multiCam = ref.watch(multiCamProvider);
+    final slot = multiCam.selectedPeerId != null ? multiCam.secondarySlots[multiCam.selectedPeerId] : null;
+    final activeStream = slot?.stream ?? widget.session.remoteStream;
+    final activeDisplay = (slot?.displayConfig ?? widget.display).copyWith(
+      cleanFeedMode: widget.display.cleanFeedMode,
+      audioMuted: widget.display.audioMuted || (slot?.displayConfig.audioMuted ?? false),
+    );
+    final activeTelemetry = slot?.telemetry ?? widget.session.telemetry;
+    final peerName = slot?.deviceName ?? widget.session.connectedPeerName;
 
+    final stage = VideoStageWidget(stream: activeStream, displayConfig: activeDisplay, borderRadius: 0, waitingLabel: waitingLabel);
+    if (widget.display.cleanFeedMode) {
+      return SizedBox.expand(
+        child: ColoredBox(
+          color: Colors.black,
+          child: GestureDetector(behavior: .opaque, onDoubleTap: () => ref.read(viewerDisplayProvider.notifier).setCleanFeed(false), child: stage),
+        ),
+      );
+    }
+
+    final compactCollision = context.isCompact && widget.display.fullscreenHudVisible && (widget.display.showTelemetry || peerName != null);
     return SizedBox.expand(
       child: ColoredBox(
         color: Colors.black,
@@ -66,18 +85,13 @@ class _FullscreenStageViewState extends ConsumerState<FullscreenStageView> {
               child: GestureDetector(
                 behavior: .opaque,
                 onTap: () => ref.read(viewerDisplayProvider.notifier).toggleFullscreenHud(),
-                child: VideoStageWidget(
-                  stream: widget.session.remoteStream,
-                  displayConfig: widget.display,
-                  borderRadius: 0,
-                  waitingLabel: waitingLabel,
-                ),
+                child: stage,
               ),
             ),
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 180),
               child: widget.display.fullscreenHudVisible
-                  ? _buildHudOverlay(peerName)
+                  ? _buildHudOverlay(peerName, activeTelemetry)
                   : const SizedBox.shrink(key: ValueKey('fullscreen-hud-hidden')),
             ),
             IgnorePointer(
@@ -100,7 +114,7 @@ class _FullscreenStageViewState extends ConsumerState<FullscreenStageView> {
     );
   }
 
-  Widget _buildHudOverlay(String? peerName) => SafeArea(
+  Widget _buildHudOverlay(String? peerName, StreamTelemetry telemetry) => SafeArea(
     key: const ValueKey('fullscreen-hud-visible'),
     child: Padding(
       padding: const .all(16),
@@ -117,16 +131,13 @@ class _FullscreenStageViewState extends ConsumerState<FullscreenStageView> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  widget.display.showTelemetry ? TelemetryOverlay(telemetry: widget.session.telemetry) : const SizedBox.shrink(),
+                  widget.display.showTelemetry ? TelemetryOverlay(telemetry: telemetry) : const SizedBox.shrink(),
                   if (peerName != null) _peerPill(peerName),
                 ],
               ),
             ),
           ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: _FullscreenHudPill(display: widget.display, onExitFullscreen: widget.onExitFullscreen),
-          ),
+          Align(alignment: Alignment.bottomCenter, child: _FullscreenHudPill(display: widget.display, onExitFullscreen: widget.onExitFullscreen)),
         ],
       ),
     ),
@@ -142,10 +153,7 @@ class _FullscreenStageViewState extends ConsumerState<FullscreenStageView> {
       children: [
         Container(width: 7, height: 7, decoration: const BoxDecoration(color: AppColors.accentGreen, shape: .circle)),
         const Icon(Icons.smartphone_rounded, size: 14, color: AppColors.primaryLight),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 180),
-          child: Text(name, overflow: .ellipsis, style: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 12, fontWeight: .w600)),
-        ),
+        ConstrainedBox(constraints: const BoxConstraints(maxWidth: 180), child: Text(name, overflow: .ellipsis, style: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 12, fontWeight: .w600))),
       ],
     ),
   );
@@ -188,9 +196,6 @@ class const _FullscreenHudPill({required final ViewerDisplayConfig display, requ
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.read(viewerDisplayProvider.notifier);
     final shortcuts = ref.watch(shortcutProvider);
-    final fitTip = shortcuts.tooltipFor(display.coverFit ? 'Fit Screen' : 'Fill Screen', .toggleFit);
-    final muteTip = shortcuts.tooltipFor(display.audioMuted ? 'Unmute' : 'Mute', .toggleMute);
-
     return Material(
       type: .transparency,
       child: _frostedPill(
@@ -204,10 +209,12 @@ class const _FullscreenHudPill({required final ViewerDisplayConfig display, requ
             mainAxisSize: .min,
             spacing: 6,
             children: [
-              _hudBtn(display.coverFit ? Icons.fit_screen_rounded : Icons.aspect_ratio_rounded, fitTip, notifier.toggleFit, active: display.coverFit),
+              _hudBtn(display.coverFit ? Icons.fit_screen_rounded : Icons.aspect_ratio_rounded, shortcuts.tooltipFor(display.coverFit ? 'Fit Screen' : 'Fill Screen', .toggleFit), notifier.toggleFit, active: display.coverFit),
               _hudBtn(Icons.rotate_right_rounded, shortcuts.tooltipFor('Rotate 90°', .rotateVideo), notifier.rotate90, active: display.quarterTurns % 4 != 0),
               _hudBtn(Icons.flip_rounded, shortcuts.tooltipFor('Mirror', .toggleMirror), notifier.toggleMirror, active: display.mirrored),
-              _hudBtn(display.audioMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded, muteTip, notifier.toggleMute, accent: display.audioMuted ? AppColors.accentOrange : null),
+              _hudBtn(Icons.tune_rounded, shortcuts.tooltipFor('Camera Rig & Color', .openCameraRig), () => RemoteCameraPanel.show(context), active: display.hasColorAdjustments || display.hasFramingAdjustments),
+              _hudBtn(Icons.crop_free_rounded, shortcuts.tooltipFor('OBS Clean View', .toggleCleanFeed), notifier.toggleCleanFeed),
+              _hudBtn(display.audioMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded, shortcuts.tooltipFor(display.audioMuted ? 'Unmute' : 'Mute', .toggleMute), notifier.toggleMute, accent: display.audioMuted ? AppColors.accentOrange : null),
               _hudBtn(Icons.content_paste_go_rounded, shortcuts.tooltipFor('Share Text', .openClipboard), () => ClipboardSyncSheet.show(context)),
               _hudBtn(Icons.speed_rounded, shortcuts.tooltipFor('Live Stats', .toggleStats), notifier.toggleTelemetry, active: display.showTelemetry),
               Container(width: 1, height: 22, margin: const .symmetric(horizontal: 2), color: Colors.white.withValues(alpha: 0.18)),
@@ -237,14 +244,7 @@ class const _FullscreenHudPill({required final ViewerDisplayConfig display, requ
     message: tip,
     child: FilledButton.tonalIcon(
       onPressed: onTap,
-      style: FilledButton.styleFrom(
-        backgroundColor: bg ?? Colors.transparent,
-        foregroundColor: AppColors.textPrimaryDark,
-        side: border != null ? BorderSide(color: border) : null,
-        minimumSize: const Size(0, 38),
-        padding: const .symmetric(horizontal: 12),
-        shape: RoundedRectangleBorder(borderRadius: .circular(12)),
-      ),
+      style: FilledButton.styleFrom(backgroundColor: bg ?? Colors.transparent, foregroundColor: AppColors.textPrimaryDark, side: border != null ? BorderSide(color: border) : null, minimumSize: const Size(0, 38), padding: const .symmetric(horizontal: 12), shape: RoundedRectangleBorder(borderRadius: .circular(12))),
       icon: Icon(icon, size: 17),
       label: Text(label),
     ),

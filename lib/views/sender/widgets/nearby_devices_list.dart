@@ -1,30 +1,49 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../../core/constants/stream_constants.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../models/discovered_peer.dart';
+import '../../../models/signaling_data.dart';
 import '../../../providers/discovery_provider.dart';
+import '../../../providers/preferences_provider.dart';
 import '../../../providers/session_provider.dart';
+import '../../../providers/settings_provider.dart';
 import 'manual_connect_sheet.dart';
 import 'pin_prompt_dialog.dart';
 
-/// Step 2 card listing nearby Receivers with radar empty state and quick-connect actions.
+/// Step 2 card listing nearby Receivers, last-endpoint quick reconnect, and USB/ADB.
 class const NearbyDevicesList({
   super.key,
   final VoidCallback? onScanQr,
 }) extends ConsumerWidget {
-  Future<void> _connectToPeer(BuildContext context, WidgetRef ref, DiscoveredPeer peer) async {
+  Future<void> _connectToEndpoint(BuildContext context, WidgetRef ref, SignalingData endpoint) async {
     String? pin;
-    if (peer.endpoint.requiresPin) {
-      pin = await promptReceiverPin(context, peer.endpoint.deviceName);
+    if (endpoint.requiresPin) {
+      pin = await promptReceiverPin(context, endpoint.deviceName);
       if (pin == null || pin.isEmpty || !context.mounted) return;
     }
-    await ref.read(sessionProvider.notifier).connectAndStream(peer.endpoint, pin: pin);
+    await ref.read(sessionProvider.notifier).connectAndStream(endpoint, pin: pin);
+  }
+
+  Future<void> _connectViaUsbAdb(WidgetRef ref) async {
+    final port = ref.read(appSettingsProvider).preferredPort;
+    final effectivePort = port > 0 ? port : StreamConstants.defaultSignalingPort;
+    final target = SignalingData(
+      ip: '127.0.0.1',
+      port: effectivePort,
+      sessionId: 'usb-${DateTime.now().millisecondsSinceEpoch}',
+      deviceName: 'USB PC (127.0.0.1)',
+    );
+    await ref.read(sessionProvider.notifier).connectAndStream(target);
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final peers = ref.watch(discoveredPeersProvider).value ?? const [];
+    final lastEndpoint = ref.watch(lastEndpointProvider);
+    final showReconnect =
+        lastEndpoint != null &&
+        !peers.any((p) => p.endpoint.ip == lastEndpoint.ip && p.endpoint.port == lastEndpoint.port);
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
@@ -47,6 +66,12 @@ class const NearbyDevicesList({
                 ),
               ],
             ),
+            if (showReconnect)
+              _ReconnectTile(
+                endpoint: lastEndpoint,
+                onConnect: () => _connectToEndpoint(context, ref, lastEndpoint),
+                onClear: () => ref.read(lastEndpointProvider.notifier).clear(),
+              ),
             if (peers.isEmpty)
               const _RadarEmptyState()
             else
@@ -57,17 +82,14 @@ class const NearbyDevicesList({
                   for (final peer in peers)
                     ListTile(
                       contentPadding: const .symmetric(horizontal: 12, vertical: 4),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: .circular(12),
-                        side: BorderSide(color: colors.outlineVariant),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: .circular(12), side: BorderSide(color: colors.outlineVariant)),
                       tileColor: colors.surfaceContainer,
                       leading: CircleAvatar(
                         backgroundColor: AppColors.primaryBlue.withValues(alpha: 0.14),
                         child: const Icon(Icons.desktop_windows_rounded, color: AppColors.primaryLight, size: 20),
                       ),
                       title: Text(peer.endpoint.deviceName, maxLines: 1, overflow: .ellipsis, style: theme.textTheme.titleSmall?.copyWith(fontWeight: .w600)),
-                      subtitle: Text(peer.endpoint.ip, maxLines: 1, overflow: .ellipsis),
+                      subtitle: Text('${peer.endpoint.ip}:${peer.endpoint.port}', maxLines: 1, overflow: .ellipsis),
                       trailing: Row(
                         mainAxisSize: .min,
                         spacing: 8,
@@ -76,12 +98,12 @@ class const NearbyDevicesList({
                             const Tooltip(message: 'PIN required', child: Icon(Icons.lock_outline_rounded, size: 18, color: AppColors.accentOrange)),
                           FilledButton(
                             style: FilledButton.styleFrom(padding: const .symmetric(horizontal: 14, vertical: 10)),
-                            onPressed: () => _connectToPeer(context, ref, peer),
+                            onPressed: () => _connectToEndpoint(context, ref, peer.endpoint),
                             child: const Text('Connect'),
                           ),
                         ],
                       ),
-                      onTap: () => _connectToPeer(context, ref, peer),
+                      onTap: () => _connectToEndpoint(context, ref, peer.endpoint),
                     ),
                 ],
               ),
@@ -97,10 +119,54 @@ class const NearbyDevicesList({
                   icon: const Icon(Icons.dns_outlined, size: 18),
                   label: const Text('Enter IP Manually'),
                 ),
+                OutlinedButton.icon(
+                  onPressed: () => _connectViaUsbAdb(ref),
+                  icon: const Icon(Icons.usb_rounded, size: 18),
+                  label: const Text('USB / ADB'),
+                ),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class const _ReconnectTile({
+  required final SignalingData endpoint,
+  required final VoidCallback onConnect,
+  required final VoidCallback onClear,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.primary.withValues(alpha: 0.08),
+        borderRadius: .circular(12),
+        border: Border.all(color: colors.primary.withValues(alpha: 0.35)),
+      ),
+      child: ListTile(
+        dense: true,
+        contentPadding: const .fromLTRB(12, 2, 6, 2),
+        leading: Icon(Icons.history_rounded, color: colors.primary, size: 20),
+        title: Text('Reconnect to ${endpoint.deviceName}', maxLines: 1, overflow: .ellipsis, style: theme.textTheme.titleSmall?.copyWith(fontWeight: .w700)),
+        subtitle: Text('${endpoint.ip}:${endpoint.port}', maxLines: 1, overflow: .ellipsis),
+        trailing: Row(
+          mainAxisSize: .min,
+          spacing: 2,
+          children: [
+            FilledButton.tonal(
+              style: FilledButton.styleFrom(visualDensity: .compact, padding: const .symmetric(horizontal: 12, vertical: 8)),
+              onPressed: onConnect,
+              child: const Text('Connect'),
+            ),
+            IconButton(visualDensity: .compact, tooltip: 'Forget saved screen', icon: const Icon(Icons.close_rounded, size: 17), onPressed: onClear),
+          ],
+        ),
+        onTap: onConnect,
       ),
     );
   }
@@ -114,11 +180,7 @@ class const _StepBadge({required final String step}) extends StatelessWidget {
       width: 26,
       height: 26,
       alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: colors.primary.withValues(alpha: 0.16),
-        shape: .circle,
-        border: Border.all(color: colors.primary.withValues(alpha: 0.45)),
-      ),
+      decoration: BoxDecoration(color: colors.primary.withValues(alpha: 0.16), shape: .circle, border: Border.all(color: colors.primary.withValues(alpha: 0.45))),
       child: Text(step, style: TextStyle(color: colors.primary, fontSize: 13, fontWeight: .w800)),
     );
   }
@@ -151,20 +213,12 @@ class _RadarEmptyStateState extends State<_RadarEmptyState> with SingleTickerPro
             child: Container(
               width: 52,
               height: 52,
-              decoration: BoxDecoration(
-                shape: .circle,
-                color: AppColors.primaryBlue.withValues(alpha: 0.15),
-                border: Border.all(color: AppColors.cyanAccent.withValues(alpha: 0.45)),
-              ),
+              decoration: BoxDecoration(shape: .circle, color: AppColors.primaryBlue.withValues(alpha: 0.15), border: Border.all(color: AppColors.cyanAccent.withValues(alpha: 0.45))),
               child: const Icon(Icons.wifi_tethering_rounded, color: AppColors.cyanAccent, size: 26),
             ),
           ),
           Text('Looking for screens on your Wi-Fi...', textAlign: .center, style: theme.textTheme.titleSmall?.copyWith(fontWeight: .w600)),
-          Text(
-            'Open Phone2Screen in Receive mode on your PC or TV.',
-            textAlign: .center,
-            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
+          Text('Open Phone2Screen in Receive mode on your PC or TV.', textAlign: .center, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
         ],
       ),
     );

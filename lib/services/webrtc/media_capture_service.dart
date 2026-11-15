@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../models/camera_control_state.dart';
 import '../../models/stream_config.dart';
+import 'camera_control_service.dart';
 
 /// Selectable desktop screen or window capture target with optional preview.
 class const DesktopSourceItem({
@@ -19,11 +21,16 @@ class MediaCaptureService {
     'phone2screen/projection_service',
   );
 
+  final CameraControlService _cameraControl = CameraControlService();
+
   MediaStream? _activeStream;
   bool _projectionServiceStarted = false;
 
   /// Currently captured local [MediaStream], or null when idle.
   MediaStream? get activeStream => _activeStream;
+
+  /// True on mobile targets that expose native camera zoom/focus helpers.
+  bool get isCameraControlPlatform => _cameraControl.isCameraControlPlatform;
 
   bool get _isNativeMobile =>
       !kIsWeb &&
@@ -211,6 +218,35 @@ class MediaCaptureService {
       return false;
     }
   }
+
+  /// Adjusts hardware zoom (`1.0..8.0`) on the active video track if supported.
+  Future<bool> setZoom(double zoom) =>
+      _cameraControl.setZoom(_activeStream?.getVideoTracks().firstOrNull, zoom);
+
+  /// Adjusts exposure compensation (`-2.0..2.0` EV) on the active video track.
+  Future<bool> setExposureOffset(double ev) => _cameraControl.setExposureOffset(
+    _activeStream?.getVideoTracks().firstOrNull,
+    ev,
+  );
+
+  /// Locks or unlocks auto-focus on the active camera track when supported.
+  Future<bool> setFocusLocked(bool locked) => _cameraControl.setFocusLocked(
+    _activeStream?.getVideoTracks().firstOrNull,
+    locked,
+  );
+
+  /// Applies a remote [RemoteCameraCommand] and returns the resulting state.
+  Future<RemoteCameraState> applyCameraCommand(
+    RemoteCameraCommand cmd,
+    RemoteCameraState current,
+  ) => _cameraControl.applyCommand(
+    cmd,
+    current,
+    stream: _activeStream,
+    switchCamera: switchCamera,
+    toggleTorch: toggleTorch,
+    setMicMuted: setMicMuted,
+  );
 
   /// Stops active media tracks, disposes stream, and halts Android FGS.
   Future<void> stopCapture() async {

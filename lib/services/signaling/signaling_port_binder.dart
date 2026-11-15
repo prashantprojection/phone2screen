@@ -3,6 +3,7 @@ import 'dart:io';
 
 import '../../core/constants/stream_constants.dart';
 import 'lan_tls_credentials.dart';
+import 'obs_clean_feed_page.dart';
 import 'web_companion_mode.dart';
 import 'web_viewer_page.dart';
 
@@ -66,8 +67,8 @@ Future<HttpServer?> tryBindHttpsPortRange(int? preferredHttpsPort) async {
   return null;
 }
 
-/// Serves static HTTP routes (`GET /health`, `GET /`, or 404) for the
-/// signaling server's companion page.
+/// Serves static HTTP routes (`GET /health`, `GET /obs`, `GET /`, or 404) for
+/// the signaling server's companion and OBS Browser Source pages.
 Future<void> serveSignalingHttpRequest(
   HttpRequest request, {
   required String sessionId,
@@ -91,6 +92,21 @@ Future<void> serveSignalingHttpRequest(
           'httpsPort': httpsPort,
           'mode': mode.name,
         }),
+      );
+    await request.response.close();
+    return;
+  }
+  if (path == StreamConstants.obsCleanFeedPath && request.method == 'GET') {
+    request.response
+      ..statusCode = HttpStatus.ok
+      ..headers.contentType = ContentType.html
+      ..write(
+        buildObsCleanFeedHtml(
+          sessionId: sessionId,
+          deviceName: deviceName,
+          requiresPin: requiresPin,
+          mode: mode,
+        ),
       );
     await request.response.close();
     return;

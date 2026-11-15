@@ -40,6 +40,8 @@ void main() {
         .toggleStats: 'S',
         .openClipboard: 'C',
         .openGuide: 'G',
+        .toggleCleanFeed: 'B',
+        .openCameraRig: 'V',
         .disconnectStream: 'X',
       };
 

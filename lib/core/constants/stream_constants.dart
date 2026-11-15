@@ -19,6 +19,8 @@ abstract final class StreamConstants {
   static const Duration connectionTimeout = Duration(seconds: 20);
   static const Duration pingInterval = Duration(seconds: 1);
   static const int maxActivePeers = 1;
+  static const int maxDesktopReceiverPeers = 4;
+  static const String obsCleanFeedPath = '/obs';
 
   // Video resolution presets
   static const int width720p = 1280;
@@ -37,7 +39,7 @@ abstract final class StreamConstants {
   static const int audioBitrate = 128_000;
   static const int defaultVideoBitrate = videoBitrate1080p;
   static const int minVideoBitrate = 500_000;
-  static const int maxVideoBitrate = 15_000_000;
+  static const int maxVideoBitrate = 25_000_000;
 
   // Fallback STUN servers for ICE candidate gathering
   static const List<String> stunServers = [

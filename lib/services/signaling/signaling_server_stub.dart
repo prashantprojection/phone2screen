@@ -2,23 +2,20 @@ import 'dart:async';
 
 import '../../core/constants/stream_constants.dart';
 import '../../models/signaling_message.dart';
+import 'signaling_peer_slot.dart';
 import 'web_companion_mode.dart';
 
 /// Web stub: browsers cannot bind an embedded `HttpServer`.
 class SignalingServerImpl {
-  final _messagesController = StreamController<SignalingMessage>.broadcast();
-  final _connectionEventsController = StreamController<bool>.broadcast();
+  final _hub = SignalingEventHub();
 
-  Stream<SignalingMessage> get messages => _messagesController.stream;
-
-  Stream<bool> get clientConnectionEvents => _connectionEventsController.stream;
-
+  Stream<SignalingMessage> get messages => _hub.messages;
+  Stream<bool> get clientConnectionEvents => _hub.clientConnectionEvents;
+  Stream<PeerSignalingEvent> get peerMessages => _hub.peerMessages;
+  Stream<PeerConnectionEvent> get peerConnectionEvents => _hub.peerConnectionEvents;
   int? get boundPort => null;
-
   int? get boundHttpsPort => null;
-
   WebCompanionMode get companionMode => .sendToReceiver;
-
   bool get isRunning => false;
 
   Future<int> start({
@@ -28,20 +25,19 @@ class SignalingServerImpl {
     required String sessionId,
     required String deviceName,
     String? pin,
+    int maxPeers = StreamConstants.maxActivePeers,
   }) {
-    throw UnsupportedError(
-      'Hosting a signaling server is not supported on Web.',
-    );
+    throw UnsupportedError('Hosting a signaling server is not supported on Web.');
   }
 
-  void send(SignalingMessage message) {}
+  void send(SignalingMessage message, {String? peerId}) {}
 
-  Future<void> disconnectClient([String reason = 'Host ended session']) async {}
+  Future<void> disconnectClient([
+    String reason = 'Host ended session',
+    String? peerId,
+  ]) async {}
 
   Future<void> stop() async {}
 
-  Future<void> dispose() async {
-    await _messagesController.close();
-    await _connectionEventsController.close();
-  }
+  Future<void> dispose() => _hub.close();
 }

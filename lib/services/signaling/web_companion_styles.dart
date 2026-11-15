@@ -131,7 +131,9 @@ button:disabled{opacity:.42;cursor:not-allowed}
   transition:background .15s,border-color .15s,color .15s;
 }
 .btn-dock.active{background:rgba(59,130,246,.22);border-color:rgba(96,165,250,.48);color:#93C5FD}
+.btn-dock.warn-active{background:rgba(245,158,11,.22);border-color:rgba(245,158,11,.55);color:#FCD34D}
 .btn-dock.stop{background:rgba(244,63,94,.16);border-color:rgba(244,63,94,.38);color:#FDA4AF}
+.btn-dock span{white-space:nowrap}
 .btn-dock .ico-off{display:none}
 .btn-dock.is-muted .ico-on{display:none}
 .btn-dock.is-muted .ico-off{display:block;color:#FDA4AF}

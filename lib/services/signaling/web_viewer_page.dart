@@ -55,8 +55,8 @@ String _ico(String d, {String cls = '', int s = 20}) =>
     '<svg class="$cls" width="$s" height="$s" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">$d</svg>';
 
-String _btn(String id, String icon, String label, {String cls = '', bool off = false, String extra = ''}) =>
-    '<button id="$id" class="btn-dock $cls" type="button"${off ? ' disabled' : ''}>$icon<span>$label</span>$extra</button>';
+String _btn(String id, String icon, String label, {String cls = '', bool off = false, String extra = '', String title = ''}) =>
+    '<button id="$id" class="btn-dock $cls" type="button"${title.isNotEmpty ? ' title="$title"' : ''}${off ? ' disabled' : ''}>$icon<span>$label</span>$extra</button>';
 
 const _iSoundOn = '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>';
 const _iSoundOff = '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>';
@@ -71,6 +71,9 @@ const _iFs = '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2
 const _iFlip = '<path d="M11 19H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5M13 5h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-5"/><circle cx="12" cy="12" r="3"/><path d="m18 22-3-3 3-3M6 2l3 3-3 3"/>';
 const _iCam = '<path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/>';
 const _iScr = '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>';
+const _iTorch = '<path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.7.6 1 1.4 1 2.3h6c0-.9.3-1.7 1-2.3A7 7 0 0 0 12 2Z"/>';
+const _iZoom = '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>';
+const _iObs = '<rect x="3" y="4" width="18" height="14" rx="2"/><circle cx="12" cy="11" r="3"/><path d="M8 21h8"/>';
 const _iStop = '<rect x="5" y="5" width="14" height="14" rx="2"/>';
 
 String _dockButtons(bool isViewer) => (isViewer
@@ -79,6 +82,10 @@ String _dockButtons(bool isViewer) => (isViewer
         _btn('btnFit', _ico(_iFit), 'Fit'),
         _btn('btnRotate', _ico(_iRot), 'Rotate'),
         _btn('btnMirror', _ico(_iMir), 'Mirror'),
+        _btn('btnRemoteFlip', _ico(_iFlip), 'Flip Cam', off: true, title: 'Flip Phone Cam'),
+        _btn('btnRemoteTorch', _ico(_iTorch), 'Light', off: true, title: 'Toggle Phone Light'),
+        _btn('btnRemoteZoom', _ico(_iZoom), '1x', off: true, title: 'Toggle Phone Zoom (1x / 2x)'),
+        _btn('btnObsLink', _ico(_iObs), 'OBS URL', title: 'Copy OBS Browser Source URL (/obs)'),
         _btn('btnStats', _ico(_iStats), 'Stats'),
         _btn('btnClipOpenDock', _ico(_iTxt), 'Text', extra: '<span id="clipDockBadge" class="badge-dot" hidden></span>'),
         _btn('btnFs', _ico(_iFs), 'Fullscreen'),

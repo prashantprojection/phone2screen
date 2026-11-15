@@ -1,29 +1,42 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../../core/constants/stream_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../providers/multi_cam_provider.dart';
+import '../../../providers/platform_provider.dart';
 import '../../../providers/session_provider.dart';
 import '../../../providers/settings_provider.dart';
 import '../../../providers/shortcut_provider.dart';
 import '../../shared/clipboard_sync_sheet.dart';
+import 'remote_camera_panel.dart';
 
-/// Floating studio control dock for viewport transforms, audio, sharing, and disconnect.
+/// Floating studio control dock for viewport transforms, camera rig, OBS clean view, and disconnect.
 class const ReceiverControlsBar({super.key}) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final display = ref.watch(viewerDisplayProvider);
     final notifier = ref.read(viewerDisplayProvider.notifier);
     final shortcuts = ref.watch(shortcutProvider);
+    final platform = ref.watch(platformServiceProvider);
+    final session = ref.watch(sessionProvider);
+    final multiCam = ref.watch(multiCamProvider);
     final colors = Theme.of(context).colorScheme;
     final compact = context.isCompact;
+    final isDesktop = !platform.isWeb && platform.isDesktop;
+
     final fitLabel = display.coverFit ? 'Fill' : 'Fit';
     final audioLabel = display.audioMuted ? 'Muted' : 'Audio';
     final fsLabel = display.isFullscreen ? 'Windowed' : 'Fullscreen';
+    final rigActive =
+        display.hasColorAdjustments || display.hasFramingAdjustments || display.showGrid;
+    final canOpenWindow =
+        multiCam.childWindows.length < StreamConstants.maxDesktopReceiverPeers - 1;
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 760),
+        constraints: const BoxConstraints(maxWidth: 960),
         child: Container(
           padding: .symmetric(horizontal: compact ? 8 : 12, vertical: 8),
           decoration: BoxDecoration(
@@ -45,9 +58,7 @@ class const ReceiverControlsBar({super.key}) extends ConsumerWidget {
               spacing: compact ? 6 : 8,
               children: [
                 _DockButton(
-                  icon: display.coverFit
-                      ? Icons.fit_screen_rounded
-                      : Icons.aspect_ratio_rounded,
+                  icon: display.coverFit ? Icons.fit_screen_rounded : Icons.aspect_ratio_rounded,
                   tooltip: shortcuts.tooltipFor(fitLabel, .toggleFit),
                   active: display.coverFit,
                   onPressed: notifier.toggleFit,
@@ -70,17 +81,31 @@ class const ReceiverControlsBar({super.key}) extends ConsumerWidget {
                   active: display.showTelemetry,
                   onPressed: notifier.toggleTelemetry,
                 ),
-                if (!compact)
-                  Container(
-                    width: 1,
-                    height: 24,
-                    margin: const .symmetric(horizontal: 2),
-                    color: colors.outlineVariant,
-                  ),
+                if (!compact) _divider(colors),
                 _DockButton(
-                  icon: display.audioMuted
-                      ? Icons.volume_off_rounded
-                      : Icons.volume_up_rounded,
+                  icon: Icons.tune_rounded,
+                  label: compact ? null : 'Camera Rig',
+                  tooltip: shortcuts.tooltipFor('Camera Rig & Color', .openCameraRig),
+                  active: rigActive,
+                  onPressed: () => RemoteCameraPanel.show(context),
+                ),
+                _DockButton(
+                  icon: Icons.crop_free_rounded,
+                  label: compact ? null : 'OBS Clean',
+                  tooltip: shortcuts.tooltipFor('OBS Clean View', .toggleCleanFeed),
+                  active: display.cleanFeedMode,
+                  onPressed: notifier.toggleCleanFeed,
+                ),
+                if (isDesktop)
+                  _DockButton(
+                    icon: Icons.open_in_new_rounded,
+                    label: compact ? null : '+ Window',
+                    tooltip: canOpenWindow ? 'Open secondary camera window' : 'Max camera windows open',
+                    onPressed: () => _openWindow(context, ref),
+                  ),
+                if (!compact) _divider(colors),
+                _DockButton(
+                  icon: display.audioMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
                   label: compact ? null : audioLabel,
                   tooltip: shortcuts.tooltipFor(audioLabel, .toggleMute),
                   accentColor: display.audioMuted ? AppColors.accentOrange : null,
@@ -88,14 +113,11 @@ class const ReceiverControlsBar({super.key}) extends ConsumerWidget {
                 ),
                 _DockButton(
                   icon: Icons.content_paste_go_rounded,
-                  label: compact ? null : 'Share Text',
                   tooltip: shortcuts.tooltipFor('Share Text', .openClipboard),
                   onPressed: () => ClipboardSyncSheet.show(context),
                 ),
                 _DockButton(
-                  icon: display.isFullscreen
-                      ? Icons.fullscreen_exit_rounded
-                      : Icons.fullscreen_rounded,
+                  icon: display.isFullscreen ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
                   label: compact ? null : fsLabel,
                   tooltip: shortcuts.tooltipFor(fsLabel, .toggleFullscreen),
                   active: display.isFullscreen,
@@ -104,7 +126,16 @@ class const ReceiverControlsBar({super.key}) extends ConsumerWidget {
                 Tooltip(
                   message: shortcuts.tooltipFor('Disconnect', .disconnectStream),
                   child: FilledButton.icon(
-                    onPressed: () => ref.read(sessionProvider.notifier).disconnect(),
+                    onPressed: () async {
+                      final hasPrimary = session.phase == .streaming ||
+                          session.phase == .connecting ||
+                          session.phase == .reconnecting;
+                      if (hasPrimary) {
+                        await ref.read(sessionProvider.notifier).disconnect();
+                      } else {
+                        await ref.read(multiCamProvider.notifier).disconnectAll();
+                      }
+                    },
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.accentRed,
                       foregroundColor: Colors.white,
@@ -123,6 +154,22 @@ class const ReceiverControlsBar({super.key}) extends ConsumerWidget {
       ),
     );
   }
+
+  Widget _divider(ColorScheme colors) => Container(
+    width: 1,
+    height: 24,
+    margin: const .symmetric(horizontal: 2),
+    color: colors.outlineVariant,
+  );
+
+  Future<void> _openWindow(BuildContext context, WidgetRef ref) async {
+    final entry = await ref.read(multiCamProvider.notifier).openCameraWindow();
+    if (entry == null && context.mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Maximum camera windows already open.')));
+    }
+  }
 }
 
 class const _DockButton({
@@ -139,18 +186,13 @@ class const _DockButton({
     final tone = accentColor ?? (active ? colors.primary : null);
     final fg = tone ?? colors.onSurface;
     final bg = tone != null ? tone.withValues(alpha: 0.16) : colors.surfaceContainer;
-    final border = tone != null
-        ? tone.withValues(alpha: 0.48)
-        : colors.outlineVariant.withValues(alpha: 0.7);
+    final border = tone != null ? tone.withValues(alpha: 0.48) : colors.outlineVariant.withValues(alpha: 0.7);
 
     return Tooltip(
       message: tooltip,
       child: Material(
         color: bg,
-        shape: RoundedRectangleBorder(
-          borderRadius: .circular(12),
-          side: BorderSide(color: border),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: .circular(12), side: BorderSide(color: border)),
         clipBehavior: .antiAlias,
         child: InkWell(
           onTap: onPressed,

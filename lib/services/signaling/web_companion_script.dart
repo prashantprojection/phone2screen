@@ -11,6 +11,8 @@ const String webCompanionScript = r'''
   let ws = null, pc = null, dc = null, stream = null, pingTimer = null;
   let remoteDescSet = false, earlyIce = [], latestClip = '', mediaBusy = false;
   let activeSource = '', currentLens = 'environment', micMuted = false;
+  const defaultCam = () => ({lens: 'back', torchOn: false, micMuted: false, zoom: 1, minZoom: 1, maxZoom: 5, controlsSupported: true});
+  let remoteCam = defaultCam();
   const iceCfg = {iceServers: [{urls: 'stun:stun.l.google.com:19302'}]};
 
   const setStatus = (txt, cls) => { statusEl.textContent = txt; statusEl.className = 'pill' + (cls ? ' ' + cls : ''); };
@@ -75,18 +77,47 @@ const String webCompanionScript = r'''
     if (pc){ try{ pc.close(); }catch(_){} pc = null; }
     if (ws){ try{ ws.onclose = null; ws.close(); }catch(_){} ws = null; }
     if (stream){ stream.getTracks().forEach((t) => t.stop()); stream = null; }
-    preview.srcObject = null; remoteDescSet = false; earlyIce = []; activeSource = ''; micMuted = false;
+    preview.srcObject = null; remoteDescSet = false; earlyIce = []; activeSource = ''; micMuted = false; remoteCam = defaultCam();
     if (btnClipSend) btnClipSend.disabled = true;
     rttEl.textContent = 'RTT -- ms'; setControlsBusy(false); setStageLive(false); updateDockState();
+  }
+
+  function applyRemoteCamState(msg){
+    remoteCam = {
+      lens: msg.lens === 'front' ? 'front' : 'back', torchOn: Boolean(msg.torchOn), micMuted: Boolean(msg.micMuted),
+      zoom: typeof msg.zoom === 'number' && isFinite(msg.zoom) ? msg.zoom : 1,
+      minZoom: typeof msg.minZoom === 'number' && isFinite(msg.minZoom) ? msg.minZoom : 1,
+      maxZoom: typeof msg.maxZoom === 'number' && isFinite(msg.maxZoom) ? msg.maxZoom : 5,
+      controlsSupported: msg.controlsSupported !== false,
+    };
+    updateDockState();
+  }
+  function sendCamCtrl(cmd, extra){
+    if (!dc || dc.readyState !== 'open') return false;
+    dc.send(JSON.stringify(Object.assign({kind: 'cam_ctrl', cmd}, extra || {})));
+    return true;
+  }
+  function publishBrowserCamState(){
+    if (CFG.mode !== 'sender' || !dc || dc.readyState !== 'open') return;
+    dc.send(JSON.stringify({
+      kind: 'cam_state', lens: currentLens === 'user' ? 'front' : 'back', torchOn: false, micMuted: Boolean(micMuted),
+      zoom: 1, minZoom: 1, maxZoom: 1, exposureOffset: 0, focusLocked: false, controlsSupported: activeSource === 'camera',
+    }));
+  }
+  function handleIncomingCamCtrl(msg){
+    if (msg.cmd === 'flip') Promise.resolve(switchLiveCamera()).then(publishBrowserCamState);
+    else if (msg.cmd === 'micMute') toggleLiveMic(typeof msg.enabled === 'boolean' ? msg.enabled : undefined);
   }
 
   function setupDataChannel(channel){
     dc = channel;
     dc.onopen = () => {
       if (btnClipSend) btnClipSend.disabled = false;
+      if (CFG.mode === 'sender') publishBrowserCamState();
+      updateDockState();
       pingTimer = setInterval(() => { if (dc && dc.readyState === 'open') dc.send(JSON.stringify({kind: 'ping', ts: Date.now()})); }, 1000);
     };
-    dc.onclose = () => { if (btnClipSend) btnClipSend.disabled = true; };
+    dc.onclose = () => { if (btnClipSend) btnClipSend.disabled = true; updateDockState(); };
     dc.onmessage = (ev) => {
       try {
         const msg = JSON.parse(ev.data);
@@ -95,7 +126,8 @@ const String webCompanionScript = r'''
         else if (msg.kind === 'clipboard' && typeof msg.text === 'string'){
           onClipboardReceived(msg.text);
           if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(msg.text).catch(() => {});
-        }
+        } else if (msg.kind === 'cam_state' && CFG.mode === 'viewer') applyRemoteCamState(msg);
+        else if (msg.kind === 'cam_ctrl' && CFG.mode === 'sender') handleIncomingCamCtrl(msg);
       } catch (_) {}
     };
   }
@@ -139,7 +171,7 @@ const String webCompanionScript = r'''
         oldTracks.forEach((t) => { stream.removeTrack(t); t.stop(); });
         stream.addTrack(track); track.onended = () => { setStatus('Stopped', ''); cleanup(true); };
         preview.srcObject = stream; preview.play().catch(() => {});
-        onApplied(); setErr(''); updateDockState();
+        onApplied(); setErr(''); updateDockState(); publishBrowserCamState();
       }
     } catch (err) { const msg = describeError(err); setErr(msg); showStageToast(msg); }
     finally { mediaBusy = false; }
@@ -152,12 +184,13 @@ const String webCompanionScript = r'''
   }
   function switchLiveSource(mode){ if (!stream) return startSender(mode); if (activeSource !== mode) return swapLiveVideo(mode, currentLens, () => { activeSource = mode; }); }
 
-  function toggleLiveMic(){
+  function toggleLiveMic(forceMuted){
     if (CFG.mode !== 'sender') return;
-    if (!stream){ const micEl = byId('mic'); if (micEl) micEl.checked = !micEl.checked; updateDockState(); return; }
+    const nextMuted = typeof forceMuted === 'boolean' ? forceMuted : !micMuted;
+    if (!stream){ const micEl = byId('mic'); if (micEl) micEl.checked = !nextMuted; updateDockState(); return; }
     const tracks = stream.getAudioTracks();
     if (!tracks.length) return;
-    micMuted = !micMuted; tracks.forEach((t) => { t.enabled = !micMuted; }); updateDockState();
+    micMuted = nextMuted; tracks.forEach((t) => { t.enabled = !micMuted; }); updateDockState(); publishBrowserCamState();
   }
 
   function openSocket(role, pin, onMessage){
