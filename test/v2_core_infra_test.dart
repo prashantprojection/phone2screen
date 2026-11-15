@@ -74,7 +74,7 @@ void main() {
       final notifier = container.read(viewerDisplayProvider.notifier);
       notifier
         ..toggleFit()
-        ..toggleCleanFeed()
+        ..enterCleanFullscreen()
         ..toggleGrid()
         ..setAspectPreset(.widescreen16x9)
         ..setDigitalZoom(9.0)
@@ -84,7 +84,8 @@ void main() {
         ..setSaturation(5.0);
 
       final state = container.read(viewerDisplayProvider);
-      expect(state.cleanFeedMode, isTrue);
+      expect(state.isFullscreen, isTrue);
+      expect(state.fullscreenHudVisible, isFalse);
       expect(state.showGrid, isTrue);
       expect(state.aspectPreset.aspectRatio, closeTo(16 / 9, 1e-6));
       expect(state.digitalZoom, 3.0);
@@ -127,7 +128,7 @@ void main() {
       final container = ProviderContainer();
       addTearDown(container.dispose);
       container.read(shortcutProvider.notifier).updateBinding(
-        .toggleCleanFeed,
+        .toggleFullscreenHud,
         const ShortcutBinding(keyId: 0x00000070, keyLabel: 'P', control: true),
       );
       final shortcuts = container.read(shortcutProvider);

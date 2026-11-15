@@ -11,7 +11,6 @@ enum ShortcutAction {
   toggleStats,
   openClipboard,
   openGuide,
-  toggleCleanFeed,
   openCameraRig,
   disconnectStream;
 
@@ -26,7 +25,6 @@ enum ShortcutAction {
     .toggleStats => 'Live Stats',
     .openClipboard => 'Share Text',
     .openGuide => 'How to Use',
-    .toggleCleanFeed => 'OBS Clean View',
     .openCameraRig => 'Camera Rig & Color',
     .disconnectStream => 'Stop / Disconnect',
   };
@@ -42,7 +40,6 @@ enum ShortcutAction {
     .toggleStats => 'Show or hide resolution, FPS, and latency overlay',
     .openClipboard => 'Open live text & clipboard sharing',
     .openGuide => 'Open the quick-start guide',
-    .toggleCleanFeed => 'Hide all window UI for OBS Window Capture',
     .openCameraRig => 'Open remote phone camera and studio color controls',
     .disconnectStream => 'End the active stream session',
   };
@@ -147,7 +144,6 @@ const Map<ShortcutAction, ShortcutBinding> defaultShortcutBindings = {
   .toggleStats: ShortcutBinding(keyId: 0x00000073, keyLabel: 'S'),
   .openClipboard: ShortcutBinding(keyId: 0x00000063, keyLabel: 'C'),
   .openGuide: ShortcutBinding(keyId: 0x00000067, keyLabel: 'G'),
-  .toggleCleanFeed: ShortcutBinding(keyId: 0x00000062, keyLabel: 'B'),
   .openCameraRig: ShortcutBinding(keyId: 0x00000076, keyLabel: 'V'),
   .disconnectStream: ShortcutBinding(keyId: 0x00000078, keyLabel: 'X'),
 };

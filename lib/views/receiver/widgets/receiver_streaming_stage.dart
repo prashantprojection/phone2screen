@@ -15,7 +15,7 @@ import 'multi_cam_grid_view.dart';
 import 'receiver_controls_bar.dart';
 import 'telemetry_overlay.dart';
 
-/// Active receiver video stage supporting windowed multi-cam, OBS Clean View, and fullscreen.
+/// Active receiver video stage supporting windowed multi-cam and unified clean fullscreen.
 class const ReceiverStreamingStage({
   super.key,
   required final SessionState session,
@@ -39,33 +39,6 @@ class const ReceiverStreamingStage({
       _ => 'Waiting for video stream...',
     };
     final multiCam = ref.watch(multiCamProvider);
-    final selectedSlot = multiCam.selectedPeerId != null
-        ? multiCam.secondarySlots[multiCam.selectedPeerId]
-        : null;
-    final activeStream = selectedSlot?.stream ?? session.remoteStream;
-    final activeDisplay = (selectedSlot?.displayConfig ?? display).copyWith(
-      cleanFeedMode: display.cleanFeedMode,
-      audioMuted: display.audioMuted || (selectedSlot?.displayConfig.audioMuted ?? false),
-    );
-
-    if (display.cleanFeedMode) {
-      return SizedBox.expand(
-        child: ColoredBox(
-          color: Colors.black,
-          child: GestureDetector(
-            behavior: .opaque,
-            onDoubleTap: () => ref.read(viewerDisplayProvider.notifier).setCleanFeed(false),
-            child: VideoStageWidget(
-              stream: activeStream,
-              displayConfig: activeDisplay,
-              borderRadius: 0,
-              waitingLabel: waitingLabel,
-            ),
-          ),
-        ),
-      );
-    }
-
     final isMultiCam = multiCam.secondarySlots.isNotEmpty;
 
     return ColoredBox(

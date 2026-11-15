@@ -16,7 +16,7 @@ import '../../shared/clipboard_sync_sheet.dart';
 import 'obs_virtual_cam_sheet.dart';
 import 'remote_camera_panel.dart';
 
-/// Floating studio control dock for viewport transforms, camera rig, OBS clean view, and disconnect.
+/// Floating studio control dock for viewport transforms, camera rig, fullscreen, and disconnect.
 class const ReceiverControlsBar({super.key}) extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -101,14 +101,6 @@ class const ReceiverControlsBar({super.key}) extends ConsumerWidget {
                         active: rigActive,
                         accentColor: rigActive ? AppColors.cyanAccent : null,
                         onPressed: () => RemoteCameraPanel.show(context),
-                      ),
-                      _DockButton(
-                        icon: Icons.crop_free_rounded,
-                        label: compact ? null : 'OBS Clean',
-                        tooltip: shortcuts.tooltipFor('OBS Clean View', .toggleCleanFeed),
-                        active: display.cleanFeedMode,
-                        accentColor: display.cleanFeedMode ? AppColors.cyanAccent : null,
-                        onPressed: notifier.toggleCleanFeed,
                       ),
                       if (isDesktop) ...[
                         _DockButton(

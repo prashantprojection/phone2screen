@@ -84,7 +84,7 @@ class const HowToUseSheet({super.key}) extends StatelessWidget {
                     steps: [
                       'Open Receive mode on PC (click + Open Camera Window for extra phones).',
                       'Open Send mode on your phone, pick a Rig Preset, and tap Connect or Scan QR Code.',
-                      'Press B (OBS Clean) on PC to hide all window UI for clean OBS Window Capture.',
+                      'Press F for Fullscreen and tap (or press O) to hide controls for clean OBS Window Capture.',
                     ],
                   ),
                   const _ScenarioCard(
@@ -213,7 +213,7 @@ class const _QuickTipsCard() extends StatelessWidget {
       ),
       (
         Icons.live_tv_rounded,
-        'OBS Studio & Multi-Cam: Use /obs in Browser Source, press B for Clean Window mode, or click + Open Camera Window on desktop to run up to 4 phones side-by-side.',
+        'OBS Studio & Multi-Cam: Use /obs in Browser Source, press F then O to hide controls for clean capture, or click + Open Camera Window on desktop to run up to 4 phones side-by-side.',
       ),
       (
         Icons.wifi_tethering_rounded,
@@ -221,7 +221,7 @@ class const _QuickTipsCard() extends StatelessWidget {
       ),
       (
         Icons.fullscreen_rounded,
-        'Studio Controls: Press V for Camera Rig & Color grading, B for OBS Clean View, F for Fullscreen (Esc exits), or customize keys in Settings.',
+        'Studio Controls: Press V for Camera Rig & Color grading, F for Fullscreen, O to hide controls (Esc exits), or customize keys in Settings.',
       ),
     ];
 

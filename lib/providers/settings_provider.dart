@@ -235,11 +235,9 @@ class ViewerDisplayNotifier extends Notifier<ViewerDisplayConfig> {
   void toggleTelemetry() =>
       state = state.copyWith(showTelemetry: !state.showTelemetry);
 
-  void toggleCleanFeed() =>
-      state = state.copyWith(cleanFeedMode: !state.cleanFeedMode);
-
-  void setCleanFeed(bool enabled) =>
-      state = state.copyWith(cleanFeedMode: enabled);
+  /// Enters clean fullscreen with HUD controls hidden (used by `--clean-feed` window launch).
+  void enterCleanFullscreen() =>
+      state = state.copyWith(isFullscreen: true, fullscreenHudVisible: false);
 
   void toggleGrid() => state = state.copyWith(showGrid: !state.showGrid);
 

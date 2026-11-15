@@ -237,7 +237,7 @@ void main() {
     expect(cfg.frameRate, 60);
   });
 
-  testWidgets('Clean View (B / Esc) and RemoteCameraPanel update ViewerDisplayConfig', (
+  testWidgets('Clean Fullscreen (F / O / Esc) and RemoteCameraPanel update ViewerDisplayConfig', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1200, 800));
@@ -269,17 +269,24 @@ void main() {
     ));
     await tester.pump();
     expect(find.byType(ReceiverControlsBar), findsOneWidget);
+    expect(find.text('OBS Clean'), findsNothing);
     expect(tester.widget<VideoStageWidget>(find.byType(VideoStageWidget)).borderRadius, 0.0);
 
-    await tester.sendKeyEvent(LogicalKeyboardKey.keyB);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
     await tester.pumpAndSettle();
-    expect(container.read(viewerDisplayProvider).cleanFeedMode, isTrue);
+    expect(container.read(viewerDisplayProvider).isFullscreen, isTrue);
     expect(find.byType(ReceiverControlsBar), findsNothing);
+    expect(find.text('Hide Controls'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyO);
+    await tester.pumpAndSettle();
+    expect(container.read(viewerDisplayProvider).fullscreenHudVisible, isFalse);
+    expect(find.text('Hide Controls'), findsNothing);
     expect(find.byType(VideoStageWidget), findsOneWidget);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
-    expect(container.read(viewerDisplayProvider).cleanFeedMode, isFalse);
+    expect(container.read(viewerDisplayProvider).isFullscreen, isFalse);
     expect(find.byType(ReceiverControlsBar), findsOneWidget);
 
     await tester.tap(find.text('Camera Rig'));

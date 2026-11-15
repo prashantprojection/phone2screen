@@ -25,7 +25,7 @@ AI agent context and engineering constraints for **Phone2Screen** (`com.example.
 - **Desktop Multi-Window (`DesktopWindowService`)**:
   - `flutter config --list` reports `enable-windowing: (Unavailable)` on Flutter `3.50.0` stable, so `DesktopWindowService` spawns isolated OS receiver processes (`--camera-slot`, `--port`, `--window-title`, `--window-offset`, `--clean-feed`) parsed in `windows/runner/main.cpp` and `WindowLaunchArgs.parse`.
 - **OBS Clean Feed & Control DataChannel**:
-  - `GET /obs` (`obs_clean_feed_page.dart`) serves a zero-UI, `cursor:none`, 1500ms auto-reconnecting WebRTC feed (`?pin=`, `?fit=cover`, `?mirror=1`, `?bg=black`), while `B` / **OBS Clean** toggles edge-to-edge `cleanFeedMode` on the desktop receiver.
+  - `GET /obs` (`obs_clean_feed_page.dart`) serves a zero-UI, `cursor:none`, 1500ms auto-reconnecting WebRTC feed (`?pin=`, `?fit=cover`, `?mirror=1`, `?bg=black`), while `F` (Fullscreen) + `O` / tap (Hide Controls) provides a unified zero-UI clean stage on the desktop receiver.
   - `phone2screen-control` DataChannel carries `ping`/`pong` RTT, `clipboard`, `cam_ctrl`, and `cam_state` frames (`CameraControlService`, `RemoteCameraPanel`).
 - **USB NIC Priority, Studio Look & Persistence**:
   - `network_address_io.dart` ranks USB tethering (`+550`, `isUsbTethered`) above Wi-Fi (`+300/+150`) and Ethernet (`+250`), demoting virtual/VPN adapters (`-1000`).

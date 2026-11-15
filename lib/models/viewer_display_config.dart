@@ -83,7 +83,6 @@ class const ViewerDisplayConfig({
   final bool isFullscreen = false,
   final bool fullscreenHudVisible = true,
   final bool showTelemetry = false,
-  final bool cleanFeedMode = false,
   final bool showGrid = false,
   final AspectPreset aspectPreset = .free,
   final double digitalZoom = 1.0,
@@ -168,7 +167,6 @@ class const ViewerDisplayConfig({
     bool? isFullscreen,
     bool? fullscreenHudVisible,
     bool? showTelemetry,
-    bool? cleanFeedMode,
     bool? showGrid,
     AspectPreset? aspectPreset,
     double? digitalZoom,
@@ -189,7 +187,6 @@ class const ViewerDisplayConfig({
     isFullscreen: isFullscreen ?? this.isFullscreen,
     fullscreenHudVisible: fullscreenHudVisible ?? this.fullscreenHudVisible,
     showTelemetry: showTelemetry ?? this.showTelemetry,
-    cleanFeedMode: cleanFeedMode ?? this.cleanFeedMode,
     showGrid: showGrid ?? this.showGrid,
     aspectPreset: aspectPreset ?? this.aspectPreset,
     digitalZoom: digitalZoom ?? this.digitalZoom,
@@ -216,7 +213,6 @@ class const ViewerDisplayConfig({
           isFullscreen == other.isFullscreen &&
           fullscreenHudVisible == other.fullscreenHudVisible &&
           showTelemetry == other.showTelemetry &&
-          cleanFeedMode == other.cleanFeedMode &&
           showGrid == other.showGrid &&
           aspectPreset == other.aspectPreset &&
           digitalZoom == other.digitalZoom &&
@@ -233,7 +229,7 @@ class const ViewerDisplayConfig({
   @override
   int get hashCode => Object.hash(
     coverFit, mirrored, quarterTurns, audioMuted, isFullscreen,
-    fullscreenHudVisible, showTelemetry, cleanFeedMode, showGrid,
+    fullscreenHudVisible, showTelemetry, showGrid,
     aspectPreset, digitalZoom, panX, panY, brightness, contrast,
     saturation, lookPreset, vignette, audioGain, audioDelayMs,
   );

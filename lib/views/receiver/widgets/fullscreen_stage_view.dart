@@ -17,7 +17,7 @@ import '../../shared/video_stage_widget.dart';
 import 'remote_camera_panel.dart';
 import 'telemetry_overlay.dart';
 
-/// Immersive fullscreen receiver stage supporting HUD controls and OBS Clean View.
+/// Immersive fullscreen receiver stage with toggleable HUD controls.
 class const FullscreenStageView({
   super.key,
   required final SessionState session,
@@ -58,22 +58,14 @@ class _FullscreenStageViewState extends ConsumerState<FullscreenStageView> {
     final slot = multiCam.selectedPeerId != null ? multiCam.secondarySlots[multiCam.selectedPeerId] : null;
     final activeStream = slot?.stream ?? widget.session.remoteStream;
     final activeDisplay = (slot?.displayConfig ?? widget.display).copyWith(
-      cleanFeedMode: widget.display.cleanFeedMode,
+      isFullscreen: true,
+      fullscreenHudVisible: widget.display.fullscreenHudVisible,
       audioMuted: widget.display.audioMuted || (slot?.displayConfig.audioMuted ?? false),
     );
     final activeTelemetry = slot?.telemetry ?? widget.session.telemetry;
     final peerName = slot?.deviceName ?? widget.session.connectedPeerName;
 
     final stage = VideoStageWidget(stream: activeStream, displayConfig: activeDisplay, borderRadius: 0, waitingLabel: waitingLabel);
-    if (widget.display.cleanFeedMode) {
-      return SizedBox.expand(
-        child: ColoredBox(
-          color: Colors.black,
-          child: GestureDetector(behavior: .opaque, onDoubleTap: () => ref.read(viewerDisplayProvider.notifier).setCleanFeed(false), child: stage),
-        ),
-      );
-    }
-
     final compactCollision = context.isCompact && widget.display.fullscreenHudVisible && (widget.display.showTelemetry || peerName != null);
     return SizedBox.expand(
       child: ColoredBox(
@@ -224,7 +216,6 @@ class const _FullscreenHudPill({required final ViewerDisplayConfig display, requ
               _hudBtn(Icons.rotate_right_rounded, shortcuts.tooltipFor('Rotate 90°', .rotateVideo), notifier.rotate90, active: display.quarterTurns % 4 != 0),
               _hudBtn(Icons.flip_rounded, shortcuts.tooltipFor('Mirror', .toggleMirror), notifier.toggleMirror, active: display.mirrored),
               _hudBtn(Icons.tune_rounded, shortcuts.tooltipFor('Camera Rig & Color', .openCameraRig), () => RemoteCameraPanel.show(context), active: display.hasColorAdjustments || display.hasFramingAdjustments),
-              _hudBtn(Icons.crop_free_rounded, shortcuts.tooltipFor('OBS Clean View', .toggleCleanFeed), notifier.toggleCleanFeed),
               _hudBtn(display.audioMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded, shortcuts.tooltipFor(display.audioMuted ? 'Unmute' : 'Mute', .toggleMute), notifier.toggleMute, accent: display.audioMuted ? AppColors.accentOrange : null),
               _hudBtn(Icons.content_paste_go_rounded, shortcuts.tooltipFor('Share Text', .openClipboard), () => ClipboardSyncSheet.show(context)),
               _hudBtn(Icons.speed_rounded, shortcuts.tooltipFor('Live Stats', .toggleStats), notifier.toggleTelemetry, active: display.showTelemetry),

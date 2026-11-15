@@ -100,7 +100,7 @@ class _VideoStageWidgetState extends State<VideoStageWidget> {
       borderRadius: .circular(widget.borderRadius),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: config.cleanFeedMode ? Colors.black : const Color(0xFF07080A),
+          color: config.isFullscreen ? Colors.black : const Color(0xFF07080A),
         ),
         child: stream == null || !_initialized
             ? _WaitingPlaceholder(label: widget.waitingLabel)
@@ -154,7 +154,8 @@ class _VideoStageWidgetState extends State<VideoStageWidget> {
           )
         : ClipRect(child: video);
 
-    final showGrid = config.showGrid && !config.cleanFeedMode;
+    // Hide the framing grid whenever fullscreen HUD controls are hidden for clean capture.
+    final showGrid = config.showGrid && !(config.isFullscreen && !config.fullscreenHudVisible);
     if (config.vignette || showGrid) {
       framed = Stack(
         fit: .expand,

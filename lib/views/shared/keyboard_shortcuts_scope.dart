@@ -48,16 +48,12 @@ class _KeyboardShortcutsScopeState
     final display = ref.read(viewerDisplayProvider);
     final displayNotifier = ref.read(viewerDisplayProvider.notifier);
 
-    // Keep Esc active to exit clean feed or fullscreen even when shortcuts are disabled.
-    if (event.logicalKey == .escape && activeRole == .receiver) {
-      if (display.cleanFeedMode) {
-        displayNotifier.setCleanFeed(false);
-        return true;
-      }
-      if (display.isFullscreen) {
-        displayNotifier.setFullscreen(false);
-        return true;
-      }
+    // Keep Esc active to exit fullscreen even when shortcuts are disabled.
+    if (event.logicalKey == .escape &&
+        activeRole == .receiver &&
+        display.isFullscreen) {
+      displayNotifier.setFullscreen(false);
+      return true;
     }
 
     // Never intercept keystrokes while typing inside an editable text field.
@@ -135,12 +131,6 @@ class _KeyboardShortcutsScopeState
         return true;
       case .openGuide:
         HowToUseSheet.show(context);
-        return true;
-      case .toggleCleanFeed:
-        if (!isReceiver || (!isSessionActive && !display.cleanFeedMode)) {
-          return false;
-        }
-        displayNotifier.toggleCleanFeed();
         return true;
       case .openCameraRig:
         if (!isReceiver || !isSessionActive) return false;

@@ -48,10 +48,10 @@
    - `?delay=<ms>` — Web Audio lip-sync delay (`0–1000 ms`) via `DelayNode`
 3. Hidden cursor (`cursor: none`), H.264 priority, and automatic **1500 ms reconnect** recover cleanly if your phone stream restarts.
 
-### Option C: PC Receiver Clean Window Mode (`B`)
+### Option C: PC Receiver Clean Fullscreen (`F` → `O`)
 1. Connect your phone(s) to the PC **Receive** app over Wi-Fi or USB for an edge-to-edge Theater/OBS stage with a floating glass control dock.
-2. Press **`B`** (or click **OBS Clean** on the floating receiver dock) to hide the header, dock, and overlays for clean **OBS Window Capture**.
-3. Double-click the video or press **`Esc`** (or **`B`**) to bring controls back.
+2. Press **`F`** (or click **Fullscreen**) and tap the video or press **`O`** (**Hide Controls**) to hide all overlays for clean **OBS Window Capture**.
+3. Tap the video or press **`O`** to bring controls back, or press **`Esc`** to exit fullscreen.
 
 ---
 
@@ -87,7 +87,6 @@ Customize every keybinding (or disable shortcuts) in **Settings → Keyboard Sho
 | Default Key | Action | What It Does |
 | --- | --- | --- |
 | `V` | Camera Rig & Color | Open remote phone camera controls, Studio Looks, audio routing & lip-sync |
-| `B` | OBS Clean View | Hide all window UI for clean OBS Window Capture |
 | `F` | Fullscreen | Enter or exit fullscreen receiver stage |
 | `O` | Fullscreen Overlay | Show or hide fullscreen HUD controls |
 | `M` | Mute Audio | Mute or unmute receiver audio / sender mic |
@@ -98,7 +97,7 @@ Customize every keybinding (or disable shortcuts) in **Settings → Keyboard Sho
 | `C` | Share Text | Open live bidirectional clipboard sync sheet |
 | `G` | How to Use | Open the quick-start guide |
 | `X` | Stop / Disconnect | End the active stream or multi-cam session |
-| `Esc` | Always Active | Exits OBS Clean View or Fullscreen even when shortcuts are disabled |
+| `Esc` | Always Active | Exits Fullscreen even when shortcuts are disabled |
 
 ---
 

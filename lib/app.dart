@@ -28,7 +28,7 @@ class _Phone2ScreenAppState extends ConsumerState<Phone2ScreenApp> {
         if (!mounted) return;
         ref.read(activeRoleProvider.notifier).setRole(.receiver);
         if (launchArgs.cleanFeed) {
-          ref.read(viewerDisplayProvider.notifier).setCleanFeed(true);
+          ref.read(viewerDisplayProvider.notifier).enterCleanFullscreen();
         }
       });
     }
@@ -43,8 +43,7 @@ class _Phone2ScreenAppState extends ConsumerState<Phone2ScreenApp> {
     final viewerDisplay = ref.watch(viewerDisplayProvider);
     final sessionPhase = ref.watch(sessionProvider.select((s) => s.phase));
     final hideHeader =
-        (activeRole == .receiver &&
-            (viewerDisplay.isFullscreen || viewerDisplay.cleanFeedMode)) ||
+        (activeRole == .receiver && viewerDisplay.isFullscreen) ||
         (activeRole == .sender &&
             settings.ecoDimPreview &&
             sessionPhase == .streaming);
