@@ -54,9 +54,14 @@ inline void SetBottomUpPixel(uint8_t* bgr24, int32_t x, int32_t y, uint8_t r,
 inline bool InsideRoundedRect(int32_t px, int32_t py, int32_t l, int32_t t,
                               int32_t r, int32_t b, int32_t rad) {
   if (px < l || px >= r || py < t || py >= b) return false;
-  const int32_t dx = px - std::clamp(px, l + rad, r - 1 - rad);
-  const int32_t dy = py - std::clamp(py, t + rad, b - 1 - rad);
-  return (dx * dx + dy * dy) <= (rad * rad);
+  // Cap corner radius to half the inclusive rect span so lo <= hi always holds
+  // for std::clamp (e.g. 16px-tall pill y=428..444 with rad=8 had 436 > 435).
+  const int32_t max_rad = (std::min)((r - 1 - l) / 2, (b - 1 - t) / 2);
+  const int32_t eff_rad = (std::min)(rad, max_rad);
+  if (eff_rad <= 0) return true;
+  const int32_t dx = px - std::clamp(px, l + eff_rad, r - 1 - eff_rad);
+  const int32_t dy = py - std::clamp(py, t + eff_rad, b - 1 - eff_rad);
+  return (dx * dx + dy * dy) <= (eff_rad * eff_rad);
 }
 
 // Renders a bottom-up 1280x720 BGR24 studio slate for Standby or Privacy Paused.
